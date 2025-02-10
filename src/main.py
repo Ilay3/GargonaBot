@@ -1,96 +1,266 @@
+import sys
 import os
-import tkinter as tk
-from tkinter import messagebox
-from tkinter import ttk
-from PIL import Image, ImageTk  # Подключаем Pillow для работы с изображениями
+import subprocess
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QPushButton, QLabel, QStackedWidget, QComboBox, QLineEdit, QCheckBox
+)
+from PySide6.QtCore import Qt
 
-# Функция для кнопок "В разработке"
-def show_coming_soon():
-    messagebox.showinfo("В разработке", "Сделано позже")
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Automation App")
+        self.setFixedSize(900, 600)
 
-# Функция для окна с ползунками
-def open_toggle_window():
-    toggle_window = tk.Toplevel(root)
-    toggle_window.title("Настройки")
+        # Переменная для процесса Anti AFK
+        self.anti_afk_process = None
 
-    toggles = {}
-    toggle_labels = {}
+        # Основной виджет и горизонтальный layout
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QHBoxLayout(central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
 
-    def toggle(name):
-        state = "Вкл" if toggles[name].get() else "Выкл"
-        toggle_labels[name].config(text=f"{name}: {state}")
+        # Левый сайдбар (меню)
+        self.sidebar = QWidget()
+        self.sidebar.setFixedWidth(200)
+        self.sidebar.setStyleSheet("background-color: #2c2c2c;")
+        sidebar_layout = QVBoxLayout(self.sidebar)
+        sidebar_layout.setContentsMargins(10, 10, 10, 10)
+        sidebar_layout.setSpacing(10)
 
-    for i in range(3):  # Добавляем 3 ползунка (можно больше)
-        name = f"Опция {i+1}"
-        toggles[name] = tk.BooleanVar()
-        frame = tk.Frame(toggle_window)
-        frame.pack(pady=5)
+        # Кнопки меню – плоские, с меньшим шрифтом и узкими отступами
+        self.btn_anti_afk = QPushButton("Anti AFK")
+        self.btn_cook = QPushButton("Cook")
+        for btn in (self.btn_anti_afk, self.btn_cook):
+            btn.setFlat(True)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setStyleSheet("""
+                QPushButton {
+                    color: white;
+                    background-color: transparent;
+                    border: none;
+                    font-size: 16px;
+                    text-align: left;
+                    padding: 5px 10px;
+                }
+                QPushButton:hover {
+                    background-color: #3a3a3a;
+                }
+                QPushButton:pressed {
+                    background-color: #444444;
+                }
+            """)
+            sidebar_layout.addWidget(btn)
+        sidebar_layout.addStretch()
 
-        toggle_labels[name] = tk.Label(frame, text=f"{name}: Выкл", font=("Arial", 12))
-        toggle_labels[name].pack(side="left")
+        # Правая панель – переключаемые страницы
+        self.stacked_widget = QStackedWidget()
+        self.stacked_widget.setStyleSheet("background-color: #f0f0f0;")
 
-        toggle_btn = ttk.Checkbutton(frame, variable=toggles[name], command=lambda n=name: toggle(n))
-        toggle_btn.pack(side="right")
+        # ===== Страница Anti AFK =====
+        self.page_anti_afk = QWidget()
+        anti_afk_layout = QVBoxLayout(self.page_anti_afk)
+        anti_afk_layout.setContentsMargins(20, 20, 20, 20)
+        anti_afk_layout.setSpacing(10)
+        anti_afk_layout.setAlignment(Qt.AlignTop)
 
-# Функция для обновления размеров логотипа и кнопок
-def resize_elements(event=None):
-    """Автоматически изменяет размер логотипа и кнопок при изменении размера окна."""
-    window_width = root.winfo_width()
-    button_size = window_width // 4  # Квадратные кнопки (четверть ширины окна)
+        label_anti_afk = QLabel("Anti AFK")
+        label_anti_afk.setStyleSheet("font-size: 20px; font-weight: bold; color: #333;")
+        anti_afk_layout.addWidget(label_anti_afk)
 
-    # Обновляем логотип
-    if os.path.exists(logo_path):
-        img = Image.open(logo_path)
-        new_width = window_width - 50  # Отнимаем немного от ширины окна для отступов
-        new_height = int((img.height / img.width) * new_width)  # Сохраняем пропорции
-        img_resized = img.resize((new_width, new_height), Image.LANCZOS)
-        logo_img_resized = ImageTk.PhotoImage(img_resized)
-        logo_label.config(image=logo_img_resized)
-        logo_label.image = logo_img_resized  # Сохраняем ссылку
+        btn_start = QPushButton("Запустить")
+        btn_start.setFlat(True)
+        btn_start.setStyleSheet("""
+            QPushButton {
+                color: #333;
+                background-color: #e0e0e0;
+                border: 1px solid #ccc;
+                font-size: 16px;
+                padding: 5px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #d0d0d0;
+            }
+            QPushButton:pressed {
+                background-color: #c0c0c0;
+            }
+        """)
+        btn_start.clicked.connect(self.startAntiAFK)
+        anti_afk_layout.addWidget(btn_start)
 
-    # Обновляем размеры кнопок
-    for btn in buttons:
-        btn.config(width=button_size, height=button_size // 4)  # Пропорция 1:4 для читабельности текста
+        # Горизонтальный layout для "Лотерея" и переключателя, выровненных по правому краю
+        lottery_layout = QHBoxLayout()
+        lottery_label = QLabel("Лотерея")
+        lottery_label.setStyleSheet("font-size: 16px; color: #333;")
+        lottery_layout.addWidget(lottery_label)
+        lottery_layout.addStretch()
+        self.lottery_switch = QCheckBox()
+        self.lottery_switch.setStyleSheet("""
+            QCheckBox::indicator {
+                width: 40px;
+                height: 20px;
+                border-radius: 10px;
+                background-color: #ccc;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #4cd964;
+            }
+        """)
+        lottery_layout.addWidget(self.lottery_switch)
+        anti_afk_layout.addLayout(lottery_layout)
 
-# Создание главного окна
-root = tk.Tk()
-root.title("Gargonabot")
-root.geometry("400x500")
+        btn_stop = QPushButton("Остановить")
+        btn_stop.setFlat(True)
+        btn_stop.setStyleSheet("""
+            QPushButton {
+                color: #333;
+                background-color: #e0e0e0;
+                border: 1px solid #ccc;
+                font-size: 16px;
+                padding: 5px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #d0d0d0;
+            }
+            QPushButton:pressed {
+                background-color: #c0c0c0;
+            }
+        """)
+        btn_stop.clicked.connect(self.stopAntiAFK)
+        anti_afk_layout.addWidget(btn_stop)
 
-# Получаем путь к директории с изображениями
-image_dir = os.path.join(os.path.dirname(__file__), "imagesformenu")
-logo_path = os.path.join(image_dir, "logo.png")
+        # ===== Страница Cook =====
+        self.page_cook = QWidget()
+        cook_layout = QVBoxLayout(self.page_cook)
+        cook_layout.setContentsMargins(20, 20, 20, 20)
+        cook_layout.setSpacing(10)
+        cook_layout.setAlignment(Qt.AlignTop)
 
-# Логотип
-if os.path.exists(logo_path):
-    img = Image.open(logo_path)
-    img_resized = img.resize((200, 100), Image.LANCZOS)  # Начальный размер
-    logo_img = ImageTk.PhotoImage(img_resized)
+        label_cook = QLabel("Cook")
+        label_cook.setStyleSheet("font-size: 20px; font-weight: bold; color: #333;")
+        cook_layout.addWidget(label_cook)
 
-    logo_label = tk.Label(root, image=logo_img)
-    logo_label.pack(pady=10)
-else:
-    logo_label = tk.Label(root, text="Логотип не найден", font=("Arial", 12, "bold"))
-    logo_label.pack(pady=10)
+        dish_label = QLabel("Выберите блюдо:")
+        dish_label.setStyleSheet("font-size: 16px; color: #333;")
+        cook_layout.addWidget(dish_label)
 
-# Название приложения
-title_label = tk.Label(root, text="GargonaBot", font=("Arial", 16, "bold"))
-title_label.pack(pady=5)
+        combo_dish = QComboBox()
+        combo_dish.addItems(["Блюдо 1", "Блюдо 2", "Блюдо 3"])
+        combo_dish.setStyleSheet("""
+            QComboBox {
+                font-size: 16px;
+                color: #000;
+                background-color: #fff;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                padding: 5px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #fff;
+                selection-background-color: #d0d0d0;
+                color: #000;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+        """)
+        cook_layout.addWidget(combo_dish)
 
-# Функциональные кнопки (список для обновления размеров)
-buttons = []
-for i in range(9):
-    btn = tk.Button(root, text=f"Кнопка {i+1}", command=show_coming_soon)
-    btn.pack(pady=5)
-    buttons.append(btn)
+        qty_label = QLabel("Количество блюд:")
+        qty_label.setStyleSheet("font-size: 16px; color: #333;")
+        cook_layout.addWidget(qty_label)
 
-# 10-я кнопка открывает окно с ползунками
-btn_settings = tk.Button(root, text="Настройки", command=open_toggle_window)
-btn_settings.pack(pady=5)
-buttons.append(btn_settings)
+        qty_edit = QLineEdit()
+        qty_edit.setStyleSheet("""
+            QLineEdit {
+                font-size: 16px;
+                padding: 5px;
+                color: #000;
+                background-color: #fff;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+            }
+        """)
+        cook_layout.addWidget(qty_edit)
 
-# Привязываем изменение размеров элементов к изменению размера окна
-root.bind("<Configure>", resize_elements)
+        btn_layout = QHBoxLayout()
+        btn_start_cook = QPushButton("Старт")
+        btn_stop_cook = QPushButton("Стоп")
+        for btn in (btn_start_cook, btn_stop_cook):
+            btn.setFlat(True)
+            btn.setStyleSheet("""
+                QPushButton {
+                    color: #333;
+                    background-color: #e0e0e0;
+                    border: 1px solid #ccc;
+                    font-size: 16px;
+                    padding: 5px;
+                    border-radius: 4px;
+                }
+                QPushButton:hover {
+                    background-color: #d0d0d0;
+                }
+                QPushButton:pressed {
+                    background-color: #c0c0c0;
+                }
+            """)
+            btn_layout.addWidget(btn)
+        btn_start_cook.clicked.connect(self.startCook)
+        btn_stop_cook.clicked.connect(self.stopCook)
+        cook_layout.addLayout(btn_layout)
 
-# Запуск приложения
-root.mainloop()
+        # Добавляем страницы в переключатель
+        self.stacked_widget.addWidget(self.page_anti_afk)
+        self.stacked_widget.addWidget(self.page_cook)
+
+        # Добавляем сайдбар и основную область в layout
+        main_layout.addWidget(self.sidebar)
+        main_layout.addWidget(self.stacked_widget)
+
+        # Связываем кнопки меню с переключением страниц
+        self.btn_anti_afk.clicked.connect(lambda: self.stacked_widget.setCurrentWidget(self.page_anti_afk))
+        self.btn_cook.clicked.connect(lambda: self.stacked_widget.setCurrentWidget(self.page_cook))
+
+    def startAntiAFK(self):
+        import os, sys, subprocess
+        print("Запуск Anti AFK")
+        # Формируем путь к файлу antiafk.py внутри папки modules, которая находится в src
+        antiafk_path = os.path.join(os.path.dirname(__file__), "modules", "AntiAfkService", "antiafk.py")
+        # Преобразуем путь в абсолютный
+        antiafk_path = os.path.abspath(antiafk_path)
+        # Проверяем, существует ли файл
+        if not os.path.exists(antiafk_path):
+            print("Файл antiafk.py не найден по пути:", antiafk_path)
+            return
+        # Запускаем antiafk.py с использованием интерпретатора из виртуального окружения
+        self.anti_afk_process = subprocess.Popen([sys.executable, antiafk_path])
+        print("Anti AFK запущен")
+
+    def stopAntiAFK(self):
+        print("Остановка Anti AFK")
+        if self.anti_afk_process is not None:
+            self.anti_afk_process.terminate()
+            self.anti_afk_process = None
+            print("Anti AFK остановлен")
+
+    def startCook(self):
+        print("Запуск Cook")
+        # Здесь можно добавить вызов функционала для режима Cook,
+        # например, через subprocess или импорт функции из другого модуля.
+        pass
+
+    def stopCook(self):
+        print("Остановка Cook")
+        # Здесь можно добавить вызов функции остановки режима Cook.
+        pass
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())

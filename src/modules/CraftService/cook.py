@@ -2,18 +2,17 @@ import cv2
 import numpy as np
 import pyautogui
 import time
-import os
 import keyboard
 
 templates = {
-    "test3": cv2.imread('imagescook/test4.png', 0),
-    "test4": cv2.imread('imagescook/test2.png', 0),
-    "test5": cv2.imread('imagescook/test3.png', 0),
+    "Vegetables": cv2.imread('../../../resources/images/ImgCook/Vegetables.png', 0),
+    "Knife": cv2.imread('../../../resources/images/ImgCook/Knife.png', 0),
+    "StartCook": cv2.imread('../../../resources/images/ImgCook/StartCook.png', 0),
 }
 
 move_positions = {
-    "test3": (684, 289),
-    "test4": (811, 298),
+    "Vegetables": (684, 289),
+    "Knife": (811, 298),
 }
 
 def find_template_on_screen(template, threshold=0.9):
@@ -39,19 +38,19 @@ for _ in range(num_dishes):
             print("Остановка программы.")
             break
         time.sleep(1)
-        pos1 = find_template_on_screen(templates["test3"])
+        pos1 = find_template_on_screen(templates["Vegetables"])
         if pos1:
             x, y = pos1
-            if "test3" in move_positions:
-                new_x, new_y = move_positions["test3"]
+            if "Vegetables" in move_positions:
+                new_x, new_y = move_positions["Vegetables"]
                 pyautogui.moveTo(x, y, duration=0.5)
                 pyautogui.dragTo(new_x, new_y, duration=0.5)
-                print(f"Перемещено test3.png в {new_x}, {new_y}")
+                print(f"Перемещено Vegetables.png в {new_x}, {new_y}")
             time.sleep(2)  # Пауза 10 секунд после перемещения test3
             break
         else:
             print("Первая картинка не найдена, продолжаем поиск...")
-    for step in ["test4", "test5"]:
+    for step in ["Knife", "StartCook"]:
         while True:
             if keyboard.is_pressed('0'):
                 print("Остановка программы.")
