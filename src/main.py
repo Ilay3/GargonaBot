@@ -32,6 +32,7 @@ COOK_PATH = os.path.join(MODULES_BASE, "CraftService", "cook.py")
 WAXTA_PATH = os.path.join(MODULES_BASE, "WorkService", "waxta.py")
 PORT_PATH = os.path.join(MODULES_BASE, "WorkService", "port.py")
 STROYKA_PATH = os.path.join(MODULES_BASE, "WorkService", "stroyka.py")
+KOZLODOY_PATH = os.path.join(MODULES_BASE, "WorkService", "kozlodoy.py")
 AUTORUN_PATH = os.path.join(MODULES_BASE, "OtherService", "autorun.py")
 
 # Используем sys.executable для запуска того же интерпретатора.
@@ -52,6 +53,7 @@ class MainWindow(QMainWindow):
             "waxta": None,
             "port": None,
             "stroyka": None,
+            "kozlodoy": None,
             "autorun": None
         }
 
@@ -59,7 +61,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
 
-        # Левое меню – QListWidget с увеличенным шрифтом.
+        # Левое меню – QListWidget с увеличенным шрифтом и выделением.
         self.menu_list = QListWidget()
         self.menu_list.setStyleSheet(
             "font-size: 18px;"
@@ -94,13 +96,11 @@ class MainWindow(QMainWindow):
         title.setStyleSheet("font-size: 20px;")
         layout.addWidget(title)
 
-        # Кнопка для запуска/остановки основного скрипта Anti-AFK.
         self.antiafk_button = QPushButton("Запустить Anti-AFK")
         self.antiafk_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.antiafk_button.clicked.connect(self.toggle_antiafk)
         layout.addWidget(self.antiafk_button)
 
-        # Переключатель для сервиса "Крутка колеса".
         self.chk_koleso = QCheckBox("Крутка колеса")
         self.chk_koleso.setStyleSheet("""
             QCheckBox::indicator { width: 15px; height: 15px; }
@@ -111,7 +111,6 @@ class MainWindow(QMainWindow):
         self.chk_koleso.toggled.connect(self.toggle_koleso)
         layout.addWidget(self.chk_koleso)
 
-        # Переключатель для сервиса "Лотерея".
         self.chk_lottery = QCheckBox("Лотерея")
         self.chk_lottery.setStyleSheet("""
             QCheckBox::indicator { width: 15px; height: 15px; }
@@ -134,7 +133,6 @@ class MainWindow(QMainWindow):
         title.setStyleSheet("font-size: 20px;")
         layout.addWidget(title)
 
-        # Метка для вывода ошибок (выше поля ввода), текст рыжим.
         self.cook_error_label = QLabel("")
         self.cook_error_label.setStyleSheet("color: #ff7043; font-size: 16px;")
         layout.addWidget(self.cook_error_label)
@@ -166,25 +164,26 @@ class MainWindow(QMainWindow):
         title.setStyleSheet("font-size: 20px;")
         layout.addWidget(title)
 
-        # Кнопка для запуска/остановки скрипта waxta.
         self.waxta_button = QPushButton("Запустить работу на Шахте")
         self.waxta_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.waxta_button.clicked.connect(self.toggle_waxta)
         layout.addWidget(self.waxta_button)
 
-        # Кнопка для запуска/остановки скрипта port.
         self.port_button = QPushButton("Запустить работу в Порту")
         self.port_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.port_button.clicked.connect(self.toggle_port)
         layout.addWidget(self.port_button)
 
-        # Новая кнопка для запуска/остановки скрипта stroyka.
         self.stroyka_button = QPushButton("Запустить работу на Стройке")
         self.stroyka_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.stroyka_button.clicked.connect(self.toggle_stroyka)
         layout.addWidget(self.stroyka_button)
 
-        # Переключатель для сервиса autorun.
+        self.kozlodoy_button = QPushButton("Запустить работу на Ферме")
+        self.kozlodoy_button.setStyleSheet("font-size: 16px; padding: 10px;")
+        self.kozlodoy_button.clicked.connect(self.toggle_kozlodoy)
+        layout.addWidget(self.kozlodoy_button)
+
         self.chk_autorun = QCheckBox("Autorun")
         self.chk_autorun.setStyleSheet("""
             QCheckBox::indicator { width: 15px; height: 15px; }
@@ -195,7 +194,6 @@ class MainWindow(QMainWindow):
         self.chk_autorun.toggled.connect(self.toggle_autorun)
         layout.addWidget(self.chk_autorun)
 
-        # Надпись-подсказка для autorun.
         self.work_hint_label = QLabel("")
         self.work_hint_label.setStyleSheet("font-size: 16px; color: #ff7043;")
         layout.addWidget(self.work_hint_label)
@@ -258,7 +256,7 @@ class MainWindow(QMainWindow):
                 self.processes["lottery"] = proc
                 print("Лотерея запущена, PID:", proc.pid)
             except Exception as e:
-                print("Ошибка при запуске Лотерееи:", e)
+                print("Ошибка при запуске Лотереи:", e)
         else:
             if self.processes.get("lottery") is not None:
                 try:
@@ -266,7 +264,7 @@ class MainWindow(QMainWindow):
                     self.processes["lottery"].wait()
                     print("Лотерея остановлена.")
                 except Exception as e:
-                    print("Ошибка при остановке Лотерееи:", e)
+                    print("Ошибка при остановке Лотереи:", e)
                 self.processes["lottery"] = None
 
     def toggle_cook(self):
@@ -367,6 +365,32 @@ class MainWindow(QMainWindow):
                 print("Стройка остановлена.")
             except Exception as e:
                 print("Ошибка при остановке Стройки:", e)
+
+    def toggle_kozlodoy(self):
+        if self.processes["kozlodoy"] is None:
+            wd = os.path.dirname(KOZLODOY_PATH)
+            try:
+                proc = subprocess.Popen(
+                    [PYTHON_EXEC, KOZLODOY_PATH],
+                    cwd=wd,
+                )
+                self.processes["kozlodoy"] = proc
+                self.kozlodoy_button.setText("Остановить работу на Ферме")
+                self.kozlodoy_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                print("Козлодой запущен, PID:", proc.pid)
+            except Exception as e:
+                print("Ошибка при запуске Козлодоя:", e)
+        else:
+            try:
+                self.processes["kozlodoy"].terminate()
+                self.processes["kozlodoy"].wait()
+                self.processes["kozlodoy"] = None
+                self.kozlodoy_button.setText("Запустить работу на Ферме")
+                self.kozlodoy_button.setStyleSheet("font-size: 16px; padding: 10px;")
+                print("Козлодой остановлен.")
+            except Exception as e:
+                print("Ошибка при остановке Козлодоя:", e)
 
     def toggle_autorun(self, checked):
         print("toggle_autorun toggled:", checked)
