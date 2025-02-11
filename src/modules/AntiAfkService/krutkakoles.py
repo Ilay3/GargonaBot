@@ -14,11 +14,6 @@ logging.basicConfig(
 )
 logging.info("Запуск скрипта koleso.")
 
-# Создаем директорию для скриншотов, если её нет
-screenshot_dir = os.path.join(os.getcwd(), '../../resources/screenshots')
-os.makedirs(screenshot_dir, exist_ok=True)
-logging.info(f"Папка для скриншотов: {screenshot_dir}")
-
 # Загружаем эталонные изображения
 templates = {
     "DostupKoleso": cv2.imread('../../../resources/images/ImgKoleso/DostupKoleso.png', 0),
@@ -33,14 +28,6 @@ def get_timestamp():
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     logging.debug(f"Получен временной штамп: {ts}")
     return ts
-
-def save_screenshot(name):
-    """Сохраняет скриншот с заданным именем и временной меткой."""
-    filename = f"{name}_{get_timestamp()}.png"
-    filepath = os.path.join(screenshot_dir, filename)
-    pyautogui.screenshot(filepath)
-    logging.info(f"Скриншот сохранён: {filepath}")
-    print(f"Скриншот сохранён: {filepath}")
 
 def find_template_on_screen(template, threshold=0.9):
     """Ищет шаблон на экране, возвращает координаты центра найденного объекта."""
@@ -65,9 +52,7 @@ while True:
     pos1 = find_template_on_screen(templates["DostupKoleso"])
 
     if pos1:
-        # Делаем первый скриншот (до нажатия)
-        save_screenshot("Koleso_Gotovo")
-        logging.info("Найден DostupKoleso, делаем скриншот перед нажатием.")
+        logging.info("Найден DostupKoleso.")
 
         # Нажимаем стрелку вверх
         pyautogui.press('up')
@@ -96,5 +81,4 @@ for step in ["IconCasino", "InterfaceKolesa", "ButtonKoloso"]:
 
 # 5. Ожидание 20 секунд и финальный скриншот
 time.sleep(20)
-save_screenshot("Koleso_Prokrucheno")
 logging.info("Финальный скриншот сохранён после 20 секунд ожидания.")
