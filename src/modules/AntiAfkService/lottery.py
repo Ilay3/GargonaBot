@@ -9,10 +9,6 @@ import pytz
 # Часовой пояс Москвы
 moscow_tz = pytz.timezone('Europe/Moscow')
 
-# Создаем директорию для скриншотов, если её нет
-screenshot_dir = os.path.join(os.getcwd(), 'screenshotslotery')
-os.makedirs(screenshot_dir, exist_ok=True)
-
 # Загружаем эталонные изображения
 templates = {
     "test3": cv2.imread('', 0),
@@ -33,7 +29,7 @@ def get_timestamp():
 def save_screenshot(name):
     """Сохраняет скриншот с заданным именем и временной меткой."""
     filename = f"{name}_{get_timestamp()}.png"
-    filepath = os.path.join(screenshot_dir, filename)
+    filepath = os.path.join(filename)
     pyautogui.screenshot(filepath)
     print(f"Скриншот сохранён: {filepath}")
 

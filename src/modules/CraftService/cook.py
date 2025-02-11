@@ -1,13 +1,21 @@
+import os
+import sys
 import cv2
 import numpy as np
 import pyautogui
 import time
 import keyboard
 
+# Определяем каталог, где находится данный файл (cook.py)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Предполагаем, что resources находится в project_root/resources
+RESOURCES_DIR = os.path.join(BASE_DIR, "..", "..", "..", "resources")
+
+# Формируем абсолютные пути к изображениям
 templates = {
-    "Vegetables": cv2.imread('../../../resources/images/ImgCook/Vegetables.png', 0),
-    "Knife": cv2.imread('../../../resources/images/ImgCook/Knife.png', 0),
-    "StartCook": cv2.imread('../../../resources/images/ImgCook/StartCook.png', 0),
+    "Vegetables": cv2.imread(os.path.join(RESOURCES_DIR, "images", "ImgCook", "Vegetables.png"), 0),
+    "Knife": cv2.imread(os.path.join(RESOURCES_DIR, "images", "ImgCook", "Knife.png"), 0),
+    "StartCook": cv2.imread(os.path.join(RESOURCES_DIR, "images", "ImgCook", "StartCook.png"), 0),
 }
 
 move_positions = {
@@ -26,17 +34,23 @@ def find_template_on_screen(template, threshold=0.9):
         return x + template.shape[1] // 2, y + template.shape[0] // 2
     return None
 
-num_dishes = int(input("Сколько блюд нужно приготовить? "))
+# Если передан аргумент, используем его, иначе запрашиваем ввод у пользователя.
+if len(sys.argv) > 1:
+    try:
+        num_dishes = int(sys.argv[1])
+    except ValueError:
+        print("Неверное значение количества блюд.")
+        sys.exit(1)
+else:
+    num_dishes = int(input("Сколько блюд нужно приготовить? "))
 
-for _ in range(num_dishes):
+for i in range(num_dishes):
     if keyboard.is_pressed('0'):
         print("Остановка программы.")
         break
-    print(f"Начинаем готовить {_ + 1}-е блюдо...")
-    while True:
-        if keyboard.is_pressed('0'):
-            print("Остановка программы.")
-            break
+    print(f"Начинаем готовить {i + 1}-е блюдо...")
+    # Поиск Vegetables
+    while not keyboard.is_pressed('0'):
         time.sleep(1)
         pos1 = find_template_on_screen(templates["Vegetables"])
         if pos1:
@@ -46,15 +60,13 @@ for _ in range(num_dishes):
                 pyautogui.moveTo(x, y, duration=0.5)
                 pyautogui.dragTo(new_x, new_y, duration=0.5)
                 print(f"Перемещено Vegetables.png в {new_x}, {new_y}")
-            time.sleep(2)  # Пауза 10 секунд после перемещения test3
+            time.sleep(2)
             break
         else:
-            print("Первая картинка не найдена, продолжаем поиск...")
+            print("Vegetables.png не найден, продолжаем поиск...")
+    # Поиск шагов "Knife" и "StartCook"
     for step in ["Knife", "StartCook"]:
-        while True:
-            if keyboard.is_pressed('0'):
-                print("Остановка программы.")
-                break
+        while not keyboard.is_pressed('0'):
             time.sleep(1)
             pos = find_template_on_screen(templates[step])
             if pos:
