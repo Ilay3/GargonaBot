@@ -1,0 +1,10 @@
+{
+    "TEST-KEY": {
+        "expiry_date": "2025-12-31 23:59:59",
+        "hwid": "HWID-1"
+    },
+    "3DAY-B5E48066": {
+        "expiry_date": "2025-02-15 03:14:14",
+        "hwid": null
+    }
+}
