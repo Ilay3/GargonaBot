@@ -11,8 +11,9 @@ moscow_tz = pytz.timezone('Europe/Moscow')
 
 # Загружаем эталонные изображения
 templates = {
-    "test3": cv2.imread('', 0),
-    "test4": cv2.imread('', 0),
+    "Iconlottery": cv2.imread('../../../resources/images/ImgLottery/Iconlottery.png', 0),
+    "Buttonlottery": cv2.imread('../../../resources/images/ImgLottery/Buttonlottery.png', 0),
+    "Backspacetriggerlottery": cv2.imread('../../../resources/images/ImgLottery/Backspacetriggerlottery.png', 0),
 }
 
 
@@ -26,15 +27,7 @@ def get_timestamp():
     return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 
-def save_screenshot(name):
-    """Сохраняет скриншот с заданным именем и временной меткой."""
-    filename = f"{name}_{get_timestamp()}.png"
-    filepath = os.path.join(filename)
-    pyautogui.screenshot(filepath)
-    print(f"Скриншот сохранён: {filepath}")
-
-
-def find_template_on_screen(template, threshold=0.5):
+def find_template_on_screen(template, threshold=0.9):
     """Ищет шаблон на экране, возвращает координаты центра найденного объекта."""
     screenshot = pyautogui.screenshot()
     screenshot = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
@@ -44,69 +37,75 @@ def find_template_on_screen(template, threshold=0.5):
     loc = np.where(res >= threshold)
 
     if len(loc[0]) > 0:
-        y, x = loc[0][0], loc[1][0]  # Берем первые найденные координаты
-        return x + template.shape[1] // 2, y + template.shape[0] // 2  # Возвращаем центр объекта
+        y, x = loc[0][0], loc[1][0]  # OpenCV возвращает (y, x), но pyautogui ожидает (x, y)
+
+        center_x = x + template.shape[1] // 2
+        center_y = y + template.shape[0] // 2
+
+        # Проверяем, не выходит ли точка за пределы экрана
+        screen_width, screen_height = pyautogui.size()
+        if 0 <= center_x <= screen_width and 0 <= center_y <= screen_height:
+            print(f"Обнаружено изображение: ({x}, {y}), центр: ({center_x}, {center_y})")
+            return center_x, center_y
+        else:
+            print(f"Координаты ({center_x}, {center_y}) за пределами экрана!")
+            return None
     return None
 
 
 def run_process():
     """Основной процесс поиска и нажатий."""
-
-    # Нажимаем стрелку вверх
+    print("Процесс запущен")
     pyautogui.press('up')
     print("Нажата стрелка вверх")
 
-    # 1. Поиск первой картинки (test3.png)
     while True:
         time.sleep(1)
-        pos1 = find_template_on_screen(templates["test3"])
+        pos1 = find_template_on_screen(templates["Iconlottery"])
 
         if pos1:
             x, y = pos1
-            pyautogui.click(x, y)  # Кликаем по найденной области
-            print(f"Клик по test3.png в координатах: {x}, {y}")
-
-            # Делаем первый скриншот
-            save_screenshot("Лотерея-Найдена")
+            pyautogui.moveTo(x, y, duration=0.2)
+            pyautogui.click(x, y)
+            print(f"Клик по Iconlottery в координатах: {x}, {y}")
+            time.sleep(1)
             break
         else:
-            print("Первая картинка не найдена, продолжаем поиск...")
+            print("Iconlottery не найдена, продолжаем поиск...")
 
-    # 2. Поиск второй картинки (test4.png)
     while True:
         time.sleep(1)
-        pos2 = find_template_on_screen(templates["test4"])
+        pos2 = find_template_on_screen(templates["Buttonlottery"])
 
         if pos2:
             x, y = pos2
-            pyautogui.click(x, y)  # Кликаем по найденной области
-            print(f"Клик по test4.png в координатах: {x}, {y}")
-
-            # Ждем 3 секунды перед скриншотом
+            pyautogui.moveTo(x, y, duration=0.2)
+            pyautogui.click(x, y)
+            print(f"Клик по Buttonlottery в координатах: {x}, {y}")
             time.sleep(3)
-
-            # Делаем второй скриншот
-            save_screenshot("Лотерея-Выполнено")
             break
         else:
-            print("Вторая картинка не найдена, продолжаем поиск...")
+            print("Buttonlottery не найдена, продолжаем поиск...")
+
+    while True:
+        time.sleep(0.05)
+        backspace_pos = find_template_on_screen(templates["Backspacetriggerlottery"])
+        if backspace_pos:
+            pyautogui.press('backspace')
+            pyautogui.press('backspace')
+            print("Обнаружено второе изображение! Дважды нажат Backspace.")
+            time.sleep(7200)  # Ожидание 2 часа перед следующей проверкой
+            break
+        else:
+            print("Изображение для Backspace не найдено, продолжаем поиск...")
 
 
-# Основной цикл: запуск раз в 2 часа с 12:01 до 23:59 по МСК
+# Запуск кода с 12:01 до 23:59 по МСК
 while True:
     now = get_moscow_time()
-    hour = now.hour
-    minute = now.minute
-
-    # Проверяем, соответствует ли текущее время условиям (каждые 2 часа начиная с 12:01)
-    if hour in range(12, 24, 2) and minute == 1:
+    if 12 <= now.hour < 24:
         print(f"Запуск процесса в {now.strftime('%H:%M:%S')} по МСК")
         run_process()
-
-        # Ждем 2 часа перед следующим запуском
-        next_run = now + timedelta(hours=2)
-        while get_moscow_time() < next_run:
-            time.sleep(30)  # Проверяем каждые 30 секунд
     else:
         print(f"Ожидание... Сейчас {now.strftime('%H:%M:%S')} по МСК")
         time.sleep(30)
