@@ -1,79 +1,70 @@
 import cv2
 import numpy as np
-import pyautogui
+import keyboard  # Быстрее чем pyautogui
 import time
-from datetime import datetime
+import mss
 
-# Загружаем эталонные изображения в градациях серого
-templates = [
-    cv2.imread('../../../resources/images/ImgKachalka/Circle2.png', 0),
-]
+# Путь к изображениям и соответствующие кнопки
+image_key_map = {
+    '../../../resources/images/ImgKachalka/Circle2.png': 'space'
+}
 
-def log(message):
-    """Выводит сообщение с текущим временем в консоль."""
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}")
-
-def find_template_on_screen(template, threshold=0.84):
-    """Ищет шаблон на экране, возвращает True, если найдено."""
-    screenshot = pyautogui.screenshot()
-    screenshot = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
-    gray_screen = cv2.cvtColor(screenshot, cv2.COLOR_BGR2GRAY)
-
-    res = cv2.matchTemplate(gray_screen, template, cv2.TM_CCOEFF_NORMED)
-    loc = np.where(res >= threshold)
-
-    if len(loc[0]) > 0:
-        log(f"Совпадение найдено! Координаты: {list(zip(loc[1], loc[0]))}")
-        return True
+# Загружаем все шаблоны и проверяем их
+templates = {}
+for path in image_key_map:
+    template = cv2.imread(path, 0)
+    if template is None:
+        print(f"Ошибка: не удалось загрузить {path}")
     else:
+        templates[path] = template
+
+# Координаты области поиска
+x1, y1, x2, y2 = 772, 607, 1123, 906  # Примерные координаты
+region = {"top": y1, "left": x1, "width": x2 - x1, "height": y2 - y1}
+
+# Захват экрана через mss
+sct = mss.mss()
+
+
+def find_template_in_region(template, screenshot_gray, threshold=0.8):
+    """Ищет шаблон в указанной области экрана."""
+    h_t, w_t = template.shape[:2]
+    h_s, w_s = screenshot_gray.shape[:2]
+
+    # Проверка, что шаблон не больше изображения
+    if h_t > h_s or w_t > w_s:
+        print(f"Ошибка: шаблон ({w_t}x{h_t}) больше, чем изображение ({w_s}x{h_s})")
         return False
 
-def display_menu():
-    """Отображает меню выбора."""
-    print("Выберите тип спортплощадки:")
-    print("1) Дешевая спортплощадка (Пирс)")
-    print("2) Средняя спортплощадка (Автошкола)")
-    print("3) Дорогая спортплощадка (Вощле банка)")
+    # Сравнение шаблона с областью
+    res = cv2.matchTemplate(screenshot_gray, template, cv2.TM_CCOEFF_NORMED)
+    return np.any(res >= threshold)
 
-    choice = input("Введите номер выбора (1, 2, 3): ")
 
-    if choice == '1':
-        log("Вы выбрали дешевую спортплощадку (Пирс).")
-        return 1  # Можно добавить код для выбора соответствующего шаблона
-    elif choice == '2':
-        log("Вы выбрали среднюю спортплощадку (Автошкола).")
-        return 2  # Можно добавить код для выбора соответствующего шаблона
-    elif choice == '3':
-        log("Вы выбрали дорогую спортплощадку (Вощле банка).")
-        return 3  # Можно добавить код для выбора соответствующего шаблона
-    else:
-        log("Неверный выбор, попробуйте снова.")
-        return display_menu()
-
-# Выводим меню и получаем выбор пользователя
-user_choice = display_menu()
-
-# Бесконечный цикл поиска
 while True:
-    log("Запуск нового цикла поиска шаблонов...")
-
-    # Запись времени начала цикла
     start_time = time.time()
 
-    # Проходим по каждому шаблону и проверяем его на экране
-    for idx, template in enumerate(templates):
-        log(f"Ищем шаблон {idx+1}...")
+    # Быстрый скриншот через mss
+    screenshot = np.array(sct.grab(region))[:, :, :3]  # Убираем альфа-канал
+    screenshot_gray = cv2.cvtColor(screenshot, cv2.COLOR_BGR2GRAY)
 
-        if find_template_on_screen(template):
-            log(f"Шаблон {idx+1} найден! Ожидание 1 миллисекунду перед нажатием пробела...")
-            time.sleep(0.001)  # Ожидание 1 миллисекунду
-            pyautogui.press("space")
-            log("Нажата клавиша пробела")
+    keys_to_press = []  # Список клавиш для одновременного нажатия
 
-    # Запись времени завершения цикла
-    end_time = time.time()
-    cycle_duration = end_time - start_time
-    log(f"Цикл поиска завершён. Время выполнения: {cycle_duration:.4f} секунд.")
+    for path, template in templates.items():
+        if find_template_in_region(template, screenshot_gray):
+            key = image_key_map[path]
+            keys_to_press.append(key)
 
-    # Пауза перед следующим циклом
-    time.sleep(0.001)  # Пауза в 1 миллисекунду перед следующей проверкой
+    # Нажимаем все найденные клавиши сразу
+    for key in keys_to_press:
+        keyboard.press(key)
+
+    time.sleep(0.005)  # Минимальная задержка (можно уменьшить до 0.005)
+
+    # Отпускаем все клавиши
+    for key in keys_to_press:
+        keyboard.release(key)
+
+    elapsed = time.time() - start_time
+    if elapsed < 0.001:
+        time.sleep(0.001 - elapsed)  # Подстройка времени
