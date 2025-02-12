@@ -89,7 +89,8 @@ def validate_key(key: str):
         print(f"📥 Ответ сервера: {data}")  # Лог ответа сервера
 
         if response.status_code == 200:
-            expiry_date = data.get("expiry_date")
+            expiry_date_str = data.get("expiry_date")
+            expiry_date = datetime.datetime.strptime(expiry_date_str, "%Y-%m-%d %H:%M:%S")
             print(f"✅ Ключ действителен. Подписка до {expiry_date}")
             return True, expiry_date
         else:
@@ -101,70 +102,6 @@ def validate_key(key: str):
 
 
 ########################################################################
-# Лицензионный диалог
-########################################################################
-
-class LicenseDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Аутентификация")
-        self.setFixedSize(400, 300)
-        layout = QVBoxLayout(self)
-
-        # Логотип (можно заменить изображением)
-        self.logo_label = QLabel("LOGO")
-        self.logo_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.logo_label)
-
-        # Поле ввода ключа
-        self.key_input = QLineEdit()
-        self.key_input.setPlaceholderText("Введите лицензионный ключ")
-        print(f"Отправляем HWID: {get_hwid()}")
-        layout.addWidget(self.key_input)
-
-        # Кнопка активации
-        self.activate_button = QPushButton("Активировать")
-        layout.addWidget(self.activate_button)
-        self.activate_button.clicked.connect(self.activate)
-
-        # Сообщение об ошибке/подтверждении
-        self.message_label = QLabel("")
-        self.message_label.setAlignment(Qt.AlignCenter)
-        self.message_label.setStyleSheet("color: #ff7043; font-size: 16px;")
-        layout.addWidget(self.message_label)
-
-        # Таймер подписки (показывает оставшееся время)
-        self.timer_label = QLabel("")
-        self.timer_label.setAlignment(Qt.AlignCenter)
-        self.timer_label.setStyleSheet("font-size: 16px;")
-        layout.addWidget(self.timer_label)
-
-        self.expiry_date = None
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_timer)
-
-    def activate(self):
-        key = self.key_input.text().strip()
-        success, expiry_date = validate_key(key)
-        if success:
-            save_license(key, expiry_date)
-            self.message_label.setText(f"Активировано! Подписка до: {expiry_date}")
-            self.accept()
-        else:
-            self.message_label.setText("Ошибка активации. Проверьте ключ.")
-
-    def update_timer(self):
-        if self.expiry_date is None:
-            return
-        now = datetime.datetime.now()
-        remaining = self.expiry_date - now
-        if remaining.total_seconds() <= 0:
-            self.timer_label.setText("Подписка истекла")
-            self.timer.stop()
-        else:
-            self.timer_label.setText(f"Осталось: {str(remaining).split('.')[0]}")
-
-########################################################################
 # Функции загрузки и сохранения лицензии
 ########################################################################
 
@@ -174,21 +111,26 @@ def load_license():
         try:
             with open(LICENSE_FILE, "r") as f:
                 license_info = json.load(f)
-            return license_info.get("expiry_date")
+
+            expiry_date_str = license_info.get("expiry_date")
+            if expiry_date_str:
+                return datetime.datetime.strptime(expiry_date_str, "%Y-%m-%d %H:%M:%S")
         except Exception as e:
             print(f"❌ Ошибка загрузки лицензии: {e}")
     return None
+
 
 def save_license(key, expiry_date):
     """Сохраняет лицензию локально."""
     license_info = {
         "key": key,
         "hwid": get_hwid(),
-        "expiry_date": expiry_date
+        "expiry_date": expiry_date.strftime("%Y-%m-%d %H:%M:%S")  # Сохраняем в виде строки
     }
     with open(LICENSE_FILE, "w") as f:
         json.dump(license_info, f)
     print(f"💾 Лицензия сохранена: подписка до {expiry_date}")
+
 
 ########################################################################
 # Основное окно приложения
@@ -599,8 +541,6 @@ if __name__ == "__main__":
     # 2️⃣ Проверяем подписку
     if expiry_date:
         now = datetime.datetime.now()
-        expiry_date = datetime.datetime.strptime(expiry_date, "%Y-%m-%d %H:%M:%S")
-
         if expiry_date > now:
             print(f"✅ Подписка активна до {expiry_date}")
             license_valid = True
@@ -615,22 +555,22 @@ if __name__ == "__main__":
         license_dialog.setWindowTitle("Аутентификация")
         license_dialog.setFixedSize(400, 300)
 
-        ld_layout = QVBoxLayout(license_dialog)
+        layout = QVBoxLayout(license_dialog)
         logo_label = QLabel("🔑 Введите лицензионный ключ")
         logo_label.setAlignment(Qt.AlignCenter)
-        ld_layout.addWidget(logo_label)
+        layout.addWidget(logo_label)
 
         key_input = QLineEdit()
         key_input.setPlaceholderText("Введите лицензионный ключ")
-        ld_layout.addWidget(key_input)
+        layout.addWidget(key_input)
 
         activate_button = QPushButton("Активировать")
-        ld_layout.addWidget(activate_button)
+        layout.addWidget(activate_button)
 
         message_label = QLabel("")
         message_label.setAlignment(Qt.AlignCenter)
         message_label.setStyleSheet("color: #ff7043; font-size: 16px;")
-        ld_layout.addWidget(message_label)
+        layout.addWidget(message_label)
 
         def on_activate():
             key = key_input.text().strip()
@@ -648,14 +588,20 @@ if __name__ == "__main__":
             print("❌ Активация не завершена. Выход...")
             sys.exit(1)
 
+        # Обновляем переменную, раз лицензия теперь действительна
+        license_valid = True
+
     # 4️⃣ Если подписка активна, запускаем основное окно приложения
     if not license_valid:
         print("❌ Подписка недействительна. Запуск невозможен.")
         sys.exit(1)
 
+    print("🚀 Запуск основного приложения...")
     window = MainWindow()
+    window.setWindowTitle("Менеджер сервисов бота")
+    window.setGeometry(100, 100, 900, 600)
     window.show()
-    window.inactive_counter = 0
-    result = app.exec()
-    sys.exit(result)
+
+    sys.exit(app.exec())
+
 
