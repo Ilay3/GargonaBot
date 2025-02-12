@@ -79,19 +79,26 @@ def get_hwid():
 ########################################################################
 
 def validate_key(key: str):
-    """Проверяет ключ через сервер"""
+    """Проверяет ключ через сервер."""
     hwid = get_hwid()
+    print(f"📤 Отправляем на сервер:\n  Ключ: {key}\n  HWID: {hwid}")  # Вывод перед отправкой
+
     try:
         response = requests.post(f"{SERVER_URL}/validate", json={"key": key, "hwid": hwid})
         data = response.json()
+        print(f"📥 Ответ сервера: {data}")  # Лог ответа сервера
+
         if response.status_code == 200:
-            return True, data.get("expiry_date")
+            expiry_date = data.get("expiry_date")
+            print(f"✅ Ключ действителен. Подписка до {expiry_date}")
+            return True, expiry_date
         else:
-            print(f"Ошибка: {data.get('message', 'Unknown error')}")
+            print(f"❌ Ошибка: {data.get('message', 'Unknown error')}")
             return False, None
     except requests.RequestException as e:
-        print(f"Ошибка подключения к серверу: {e}")
+        print(f"❌ Ошибка подключения к серверу: {e}")
         return False, None
+
 
 ########################################################################
 # Лицензионный диалог
@@ -162,27 +169,18 @@ class LicenseDialog(QDialog):
 ########################################################################
 
 def load_license():
-    """Проверяет локальный ключ и валидирует его через сервер"""
+    """Загружает локальный ключ лицензии."""
     if os.path.exists(LICENSE_FILE):
         try:
             with open(LICENSE_FILE, "r") as f:
                 license_info = json.load(f)
-            key = license_info.get("key")
-            saved_hwid = license_info.get("hwid")
-
-            if key and saved_hwid:
-                success, expiry_date = validate_key(key)
-                if success:
-                    return expiry_date
-                else:
-                    print("Ключ недействителен. Перезапросите активацию.")
-                    return None
+            return license_info.get("expiry_date")
         except Exception as e:
-            print(f"Ошибка загрузки лицензии: {e}")
+            print(f"❌ Ошибка загрузки лицензии: {e}")
     return None
 
 def save_license(key, expiry_date):
-    """Сохраняет лицензию локально"""
+    """Сохраняет лицензию локально."""
     license_info = {
         "key": key,
         "hwid": get_hwid(),
@@ -190,7 +188,7 @@ def save_license(key, expiry_date):
     }
     with open(LICENSE_FILE, "w") as f:
         json.dump(license_info, f)
-
+    print(f"💾 Лицензия сохранена: подписка до {expiry_date}")
 
 ########################################################################
 # Основное окно приложения
