@@ -1,7 +1,8 @@
 import cv2
 import numpy as np
-import pyautogui
+import keyboard  # Быстрее чем pyautogui
 import time
+import mss
 
 # Путь к изображениям и соответствующие кнопки
 image_key_map = {
@@ -18,27 +19,44 @@ image_key_map = {
 # Загружаем все шаблоны
 templates = {path: cv2.imread(path, 0) for path in image_key_map}
 
-# Координаты области поиска (задать вручную)
+# Координаты области поиска
 x1, y1, x2, y2 = 922, 902, 992, 963  # Примерные координаты
+region = {"top": y1, "left": x1, "width": x2 - x1, "height": y2 - y1}
+
+# Захват экрана через mss
+sct = mss.mss()
 
 
-def find_template_in_region(template, region, threshold=0.8):
+def find_template_in_region(template, screenshot_gray, threshold=0.8):
     """Ищет шаблон в указанной области экрана."""
-    screenshot = pyautogui.screenshot(region=region)
-    screenshot = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
-    gray_screen = cv2.cvtColor(screenshot, cv2.COLOR_BGR2GRAY)
-
-    res = cv2.matchTemplate(gray_screen, template, cv2.TM_CCOEFF_NORMED)
-    loc = np.where(res >= threshold)
-    return len(loc[0]) > 0
+    res = cv2.matchTemplate(screenshot_gray, template, cv2.TM_CCOEFF_NORMED)
+    return np.any(res >= threshold)
 
 
-# Бесконечный цикл поиска
 while True:
-    region = (x1, y1, x2 - x1, y2 - y1)
+    start_time = time.time()
+
+    # Быстрый скриншот через mss
+    screenshot = np.array(sct.grab(region))[:, :, :3]  # Убираем альфа-канал
+    screenshot_gray = cv2.cvtColor(screenshot, cv2.COLOR_BGR2GRAY)
+
+    keys_to_press = []  # Список клавиш для одновременного нажатия
+
     for path, template in templates.items():
-        if find_template_in_region(template, region):
-            pyautogui.press(image_key_map[path])
-            print(f"Обнаружено {path}, нажата клавиша {image_key_map[path]}")
-            time.sleep(0.001)  # Задержка 1 мс
-    time.sleep(0.01)  # Основной цикл с небольшой задержкой
+        if find_template_in_region(template, screenshot_gray):
+            key = image_key_map[path]
+            keys_to_press.append(key)
+
+    # Нажимаем все найденные клавиши сразу
+    for key in keys_to_press:
+        keyboard.press(key)
+
+    time.sleep(0.005)  # Минимальная задержка (можно уменьшить до 0.005)
+
+    # Отпускаем все клавиши
+    for key in keys_to_press:
+        keyboard.release(key)
+
+    elapsed = time.time() - start_time
+    if elapsed < 0.001:
+        time.sleep(0.001 - elapsed)  # Подстройка времени

@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 # Сервер для проверки лицензий
-SERVER_URL = "http://127.0.0.1:5000"
+SERVER_URL = "http://83.220.165.162:5000"
 
 # Определяем базовый каталог – где находится main.py.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -112,6 +112,7 @@ class LicenseDialog(QDialog):
         # Поле ввода ключа
         self.key_input = QLineEdit()
         self.key_input.setPlaceholderText("Введите лицензионный ключ")
+        print(f"Отправляем HWID: {get_hwid()}")
         layout.addWidget(self.key_input)
 
         # Кнопка активации
@@ -591,74 +592,68 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == "__main__":
-    import json
-    import requests
-
-    SERVER_URL = "http://127.0.0.1:5000"  # Сервер проверки лицензий
-    license_valid = False
-    expiry_date = None
-
-
-    def validate_key(key: str):
-        """Проверяет ключ на сервере"""
-        hwid = get_hwid()
-        try:
-            response = requests.post(f"{SERVER_URL}/validate", json={"key": key, "hwid": hwid})
-            data = response.json()
-            if response.status_code == 200:
-                return True, data.get("expiry_date")
-            else:
-                print(f"Ошибка: {data.get('message', 'Unknown error')}")
-                return False, None
-        except requests.RequestException as e:
-            print(f"Ошибка подключения к серверу: {e}")
-            return False, None
-
-
-    expiry_date = load_license()
-    if expiry_date and expiry_date > datetime.datetime.now():
-        license_valid = True
-
     app = QApplication(sys.argv)
+    license_valid = False
 
+    # 1️⃣ Загружаем сохранённую лицензию
+    expiry_date = load_license()
+
+    # 2️⃣ Проверяем подписку
+    if expiry_date:
+        now = datetime.datetime.now()
+        expiry_date = datetime.datetime.strptime(expiry_date, "%Y-%m-%d %H:%M:%S")
+
+        if expiry_date > now:
+            print(f"✅ Подписка активна до {expiry_date}")
+            license_valid = True
+        else:
+            print("❌ Подписка истекла. Требуется новый ключ!")
+    else:
+        print("❌ Ключ не найден. Требуется активация!")
+
+    # 3️⃣ Если подписка недействительна, запрашиваем ключ у пользователя
     if not license_valid:
         license_dialog = QDialog()
         license_dialog.setWindowTitle("Аутентификация")
         license_dialog.setFixedSize(400, 300)
+
         ld_layout = QVBoxLayout(license_dialog)
-        logo_label = QLabel("LOGO")
+        logo_label = QLabel("🔑 Введите лицензионный ключ")
         logo_label.setAlignment(Qt.AlignCenter)
         ld_layout.addWidget(logo_label)
+
         key_input = QLineEdit()
         key_input.setPlaceholderText("Введите лицензионный ключ")
         ld_layout.addWidget(key_input)
+
         activate_button = QPushButton("Активировать")
         ld_layout.addWidget(activate_button)
+
         message_label = QLabel("")
         message_label.setAlignment(Qt.AlignCenter)
         message_label.setStyleSheet("color: #ff7043; font-size: 16px;")
         ld_layout.addWidget(message_label)
-        timer_label = QLabel("")
-        timer_label.setAlignment(Qt.AlignCenter)
-        timer_label.setStyleSheet("font-size: 16px;")
-        ld_layout.addWidget(timer_label)
-
 
         def on_activate():
             key = key_input.text().strip()
             success, expiry = validate_key(key)
             if success:
-                save_license(key, expiry)
-                message_label.setText(f"Активировано! Подписка до: {expiry}")
+                save_license(key, expiry)  # Сохраняем лицензию
+                message_label.setText(f"✅ Активировано! Подписка до: {expiry}")
                 license_dialog.accept()
             else:
-                message_label.setText("Ошибка активации. Проверьте ключ.")
-
+                message_label.setText("❌ Ошибка активации. Проверьте ключ.")
 
         activate_button.clicked.connect(on_activate)
 
         if license_dialog.exec() != QDialog.Accepted:
-            sys.exit(0)
+            print("❌ Активация не завершена. Выход...")
+            sys.exit(1)
+
+    # 4️⃣ Если подписка активна, запускаем основное окно приложения
+    if not license_valid:
+        print("❌ Подписка недействительна. Запуск невозможен.")
+        sys.exit(1)
 
     window = MainWindow()
     window.show()
