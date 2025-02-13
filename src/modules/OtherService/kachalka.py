@@ -1,12 +1,13 @@
 import cv2
 import numpy as np
-import keyboard  # Быстрее чем pyautogui
+import keyboard  # Быстрее, чем pyautogui
 import time
 import mss
 
 # Путь к изображениям и соответствующие кнопки
 image_key_map = {
-    '../../../resources/images/ImgKachalka/Circle2.png': 'space'
+    '../../../resources/images/ImgKachalka/Circle1.png': 'space',
+    '../../../resources/images/ImgKachalka/Circle2.png': 'space'  # Добавлен новый шаблон
 }
 
 # Загружаем все шаблоны и проверяем их
@@ -48,18 +49,18 @@ while True:
     screenshot = np.array(sct.grab(region))[:, :, :3]  # Убираем альфа-канал
     screenshot_gray = cv2.cvtColor(screenshot, cv2.COLOR_BGR2GRAY)
 
-    keys_to_press = []  # Список клавиш для одновременного нажатия
+    keys_to_press = set()  # Используем set, чтобы избежать дубликатов
 
     for path, template in templates.items():
         if find_template_in_region(template, screenshot_gray):
             key = image_key_map[path]
-            keys_to_press.append(key)
+            keys_to_press.add(key)
 
     # Нажимаем все найденные клавиши сразу
     for key in keys_to_press:
         keyboard.press(key)
 
-    time.sleep(0.005)  # Минимальная задержка (можно уменьшить до 0.005)
+    time.sleep(0.005)  # Минимальная задержка
 
     # Отпускаем все клавиши
     for key in keys_to_press:
