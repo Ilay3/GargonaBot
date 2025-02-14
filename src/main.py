@@ -170,9 +170,12 @@ def save_license(key, expiry_date):
         "hwid": get_hwid(),
         "expiry_date": expiry_date.strftime("%Y-%m-%d %H:%M:%S")
     }
-    with open(LICENSE_FILE, "w") as f:
-        json.dump(license_info, f)
-    print(f"💾 Лицензия сохранена: подписка до {expiry_date}")
+    try:
+        with open(LICENSE_FILE, "w") as f:
+            json.dump(license_info, f)
+        print(f"💾 Лицензия сохранена: подписка до {expiry_date}")
+    except Exception as e:
+        print(f"❌ Ошибка при сохранении лицензии: {e}")
 
 ########################################################################
 # Основное окно приложения
