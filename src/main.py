@@ -201,8 +201,13 @@ class MainWindow(QMainWindow):
             "taxi": None,
             "fireman": None,
             "shveika": None,
-            "skolzkaya": None
+            "skolzkaya": None,
+            "telegram_bot": None
+
         }
+
+        self.start_telegram_bot_automatically()
+
         self.inactive_counter = 0
         self.bots_killed_due_to_inactivity = False
 
@@ -238,6 +243,7 @@ class MainWindow(QMainWindow):
         self.menu_list.addItem("Спортзал")
         self.menu_list.addItem("Контракты")
         self.menu_list.addItem("Настройки")
+        self.menu_list.addItem("Телеграмм")
 
         self.menu_list.currentRowChanged.connect(self.switch_page)
         left_layout.addWidget(self.menu_list)
@@ -259,6 +265,7 @@ class MainWindow(QMainWindow):
         self.page_sportzal = self.create_sportzal_page()
         self.page_contracts = self.create_contracts_page()
         self.page_settings = self.create_settings_page()
+        self.tg_page = self.create_tg_page()
 
 
         self.pages.addWidget(self.page_antiafk)
@@ -268,6 +275,7 @@ class MainWindow(QMainWindow):
         self.pages.addWidget(self.page_sportzal)
         self.pages.addWidget(self.page_contracts)
         self.pages.addWidget(self.page_settings)
+        self.pages.addWidget(self.tg_page)
         main_layout.addWidget(self.pages, 3)
         self.switch_page(0)
 
@@ -632,6 +640,70 @@ class MainWindow(QMainWindow):
 
         layout.addStretch()
         return widget
+
+    def create_tg_page(self):
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+
+        title = QLabel("Telegram")
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("font-size: 20px;")
+        layout.addWidget(title)
+
+        desc = QLabel(
+            "Введите токен вашего Telegram бота и Chat ID, затем сохраните настройки. При запуске приложения, если настройки заданы, бот автоматически отправит сообщение об успешной авторизации.")
+        desc.setAlignment(Qt.AlignCenter)
+        desc.setWordWrap(True)
+        desc.setStyleSheet("font-size: 16px;")
+        layout.addWidget(desc)
+
+        token_label = QLabel("Telegram Bot Token:")
+        token_label.setAlignment(Qt.AlignCenter)
+        token_label.setStyleSheet("font-size: 16px;")
+        layout.addWidget(token_label)
+
+        self.telegram_token_input = QLineEdit()
+        self.telegram_token_input.setPlaceholderText("Введите токен")
+        self.telegram_token_input.setStyleSheet("font-size: 16px; padding: 5px;")
+        layout.addWidget(self.telegram_token_input)
+
+        chat_id_label = QLabel("Telegram Chat ID:")
+        chat_id_label.setAlignment(Qt.AlignCenter)
+        chat_id_label.setStyleSheet("font-size: 16px;")
+        layout.addWidget(chat_id_label)
+
+        self.telegram_chat_id_input = QLineEdit()
+        self.telegram_chat_id_input.setPlaceholderText("Введите Chat ID")
+        self.telegram_chat_id_input.setStyleSheet("font-size: 16px; padding: 5px;")
+        layout.addWidget(self.telegram_chat_id_input)
+
+        # Загружаем сохранённые настройки и заполняем поля
+        settings = load_settings()
+        self.telegram_token_input.setText(settings.get("telegram_token", ""))
+        self.telegram_chat_id_input.setText(settings.get("telegram_chat_id", ""))
+
+        # Только кнопка сохранения настроек (без кнопки запуска)
+        self.tg_save_button = QPushButton("Сохранить настройки")
+        self.tg_save_button.setStyleSheet("font-size: 16px; padding: 10px;")
+        self.tg_save_button.clicked.connect(self.save_tg_settings)
+        layout.addWidget(self.tg_save_button)
+
+        layout.addStretch()
+        return widget
+
+    def save_tg_settings(self):
+        token = self.telegram_token_input.text().strip()
+        chat_id = self.telegram_chat_id_input.text().strip()
+        if token and chat_id:
+            settings = load_settings()
+            settings["telegram_token"] = token
+            settings["telegram_chat_id"] = chat_id
+            save_settings(settings)
+            QMessageBox.information(self, "Настройки сохранены",
+                                    f"Telegram настройки сохранены:\nToken: {token}\nChat ID: {chat_id}")
+        else:
+            QMessageBox.critical(self, "Ошибка", "Введите корректные значения для токена и Chat ID")
+
 
     def save_passive_settings(self):
         """Сохраняет настройки для функций Automood, Autorun и Autoeat."""
@@ -1106,6 +1178,32 @@ class MainWindow(QMainWindow):
         except Exception as e:
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, "Ошибка запуска", f"Не удалось запустить игру: {e}")
+
+    def start_telegram_bot_automatically(self):
+        settings = load_settings()
+        token = settings.get("telegram_token", "")
+        chat_id = settings.get("telegram_chat_id", "")
+        if token and chat_id:
+            try:
+                # Попытка запустить telegram_bot.py, если он существует
+                telegram_bot_path = os.path.join(MODULES_BASE, "OtherService", "telegram_bot.py")
+                if os.path.exists(telegram_bot_path):
+                    wd = os.path.dirname(telegram_bot_path)
+                    proc = subprocess.Popen([PYTHON_EXEC, telegram_bot_path, token], cwd=wd)
+                    self.processes["telegram_bot"] = proc
+                    print("Telegram бот запущен, PID:", proc.pid)
+                else:
+                    print("telegram_bot.py не найден – пропускаем запуск скрипта.")
+                # Отправляем сообщение через Telegram API
+                url = f"https://api.telegram.org/bot{token}/sendMessage"
+                payload = {"chat_id": chat_id, "text": "Авторизация успешна, Telegram бот запущен."}
+                response = requests.post(url, data=payload)
+                if response.status_code == 200:
+                    print("Сообщение отправлено в Telegram.")
+                else:
+                    print(f"Ошибка отправки сообщения: {response.text}")
+            except Exception as e:
+                print(f"Ошибка при автоматическом запуске Telegram бота: {e}")
 
     def kill_all_bots(self):
         for key in self.processes:
