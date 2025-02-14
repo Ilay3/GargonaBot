@@ -198,6 +198,10 @@ class MainWindow(QMainWindow):
         # Загружаем дату окончания лицензии (если лицензия активна)
         self.license_expiry = load_license()
 
+        self.license_check_timer = QTimer(self)
+        self.license_check_timer.timeout.connect(self.periodic_license_check)
+        self.license_check_timer.start(3600000)
+
         # Центральный виджет и основной layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -257,6 +261,22 @@ class MainWindow(QMainWindow):
         self.license_timer = QTimer(self)
         self.license_timer.timeout.connect(self.update_license_label)
         self.license_timer.start(1000)
+
+    def periodic_license_check(self):
+        """Проверяет периодически, не истекла ли лицензия, и завершает работу приложения, если срок действия истёк."""
+        if self.license_expiry:
+            now = datetime.datetime.now()
+            if now >= self.license_expiry:
+                print("❌ Лицензия истекла. Завершение работы приложения.")
+                # Можно вывести диалоговое окно с сообщением
+                error_dialog = QDialog(self)
+                error_dialog.setWindowTitle("Ошибка лицензии")
+                dlg_layout = QVBoxLayout(error_dialog)
+                msg_label = QLabel("Срок действия лицензии истек. Приложение будет закрыто.")
+                msg_label.setAlignment(Qt.AlignCenter)
+                dlg_layout.addWidget(msg_label)
+                error_dialog.exec()
+                QApplication.quit()
 
     def update_license_label(self):
         """Обновляет метку с информацией о подписке."""
