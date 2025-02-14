@@ -1,3 +1,4 @@
+import ctypes
 import sys
 import os
 import subprocess
@@ -11,7 +12,7 @@ import json
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QListWidget, QStackedWidget, QPushButton, QLabel, QLineEdit, QCheckBox, QDialog, QSizePolicy
+    QListWidget, QStackedWidget, QPushButton, QLabel, QLineEdit, QCheckBox, QDialog, QSizePolicy, QMessageBox
 )
 
 # Сервер для проверки лицензий
@@ -28,6 +29,16 @@ else:
 LICENSE_FILE = os.path.join(PROJECT_ROOT, "license.dat")
 SETTINGS_FILE = os.path.join(PROJECT_ROOT, "settings.json")
 print(f"Используется файл настроек: {SETTINGS_FILE}")
+
+def get_keyboard_layout():
+    user32 = ctypes.WinDLL('user32', use_last_error=True)
+    hwnd = user32.GetForegroundWindow()
+    thread_id = user32.GetWindowThreadProcessId(hwnd, None)
+    layout_id = user32.GetKeyboardLayout(thread_id)
+    return layout_id & 0xFFFF
+
+LANG_ENGLISH = 0x0409
+
 
 # Функции для работы с настройками
 def load_settings():
@@ -202,6 +213,10 @@ class MainWindow(QMainWindow):
         self.license_check_timer.timeout.connect(self.periodic_license_check)
         self.license_check_timer.start(3600000)
 
+        self.keyboard_timer = QTimer(self)
+        self.keyboard_timer.timeout.connect(self.check_keyboard_layout)
+        self.keyboard_timer.start(10000)
+
         # Центральный виджет и основной layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -222,6 +237,7 @@ class MainWindow(QMainWindow):
         self.menu_list.addItem("Пассивные функции")
         self.menu_list.addItem("Спортзал")
         self.menu_list.addItem("Контракты")
+        self.menu_list.addItem("Настройки")
 
         self.menu_list.currentRowChanged.connect(self.switch_page)
         left_layout.addWidget(self.menu_list)
@@ -242,6 +258,7 @@ class MainWindow(QMainWindow):
         self.page_automood = self.create_automood_page()
         self.page_sportzal = self.create_sportzal_page()
         self.page_contracts = self.create_contracts_page()
+        self.page_settings = self.create_settings_page()
 
 
         self.pages.addWidget(self.page_antiafk)
@@ -250,6 +267,7 @@ class MainWindow(QMainWindow):
         self.pages.addWidget(self.page_automood)
         self.pages.addWidget(self.page_sportzal)
         self.pages.addWidget(self.page_contracts)
+        self.pages.addWidget(self.page_settings)
         main_layout.addWidget(self.pages, 3)
         self.switch_page(0)
 
@@ -261,6 +279,11 @@ class MainWindow(QMainWindow):
         self.license_timer = QTimer(self)
         self.license_timer.timeout.connect(self.update_license_label)
         self.license_timer.start(1000)
+
+    def check_keyboard_layout(self):
+        if get_keyboard_layout() != LANG_ENGLISH:
+            QMessageBox.warning(self, "Внимание!",
+                                "Пожалуйста, переключите раскладку клавиатуры на английскую, наш бот работает только с ней!")
 
     def periodic_license_check(self):
         """Проверяет периодически, не истекла ли лицензия, и завершает работу приложения, если срок действия истёк."""
@@ -559,6 +582,53 @@ class MainWindow(QMainWindow):
         self.kachalka_launch_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.kachalka_launch_button.clicked.connect(self.toggle_kachalka)
         layout.addWidget(self.kachalka_launch_button)
+
+        layout.addStretch()
+        return widget
+
+    def create_settings_page(self):
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+
+        # Заголовок страницы
+        title = QLabel("Настройки")
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("font-size: 20px;")
+        layout.addWidget(title)
+
+        # Описание
+        desc = QLabel("Введите путь до файла Rage MP (exe), который будет запускаться.")
+        desc.setAlignment(Qt.AlignCenter)
+        desc.setWordWrap(True)
+        desc.setStyleSheet("font-size: 16px;")
+        layout.addWidget(desc)
+
+        # Поле ввода пути
+        path_label = QLabel("Путь до Rage MP:")
+        path_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(path_label)
+
+        self.rage_mp_path_input = QLineEdit()
+        self.rage_mp_path_input.setPlaceholderText("Например: C:\\Program Files\\RageMP\\RageMP.exe")
+        self.rage_mp_path_input.setStyleSheet("font-size: 16px; padding: 5px;")
+        layout.addWidget(self.rage_mp_path_input)
+
+        # Загружаем сохранённые настройки (если они есть) и заполняем поле
+        settings = load_settings()
+        current_path = settings.get("rage_mp_path", "")
+        self.rage_mp_path_input.setText(current_path)
+
+        # Кнопка запуска игры
+        self.launch_game_button = QPushButton("Запустить игру")
+        self.launch_game_button.setStyleSheet("font-size: 16px; padding: 10px;")
+        self.launch_game_button.clicked.connect(self.toggle_launch_game)
+        layout.addWidget(self.launch_game_button)
+
+        # Кнопка сохранения настроек (опционально, можно объединить с запуском)
+        self.settings_save_button = QPushButton("Сохранить настройки")
+        self.settings_save_button.setStyleSheet("font-size: 16px; padding: 10px;")
+        self.settings_save_button.clicked.connect(self.save_settings_page)
+        layout.addWidget(self.settings_save_button)
 
         layout.addStretch()
         return widget
@@ -1005,6 +1075,37 @@ class MainWindow(QMainWindow):
                 print("Игра не активна 3 минуты. Останавливаем всех ботов.")
                 self.kill_all_bots()
                 self.bots_killed_due_to_inactivity = True
+
+    def save_settings_page(self):
+        rage_mp_path = self.rage_mp_path_input.text().strip()
+        if rage_mp_path:
+            settings = load_settings()
+            settings["rage_mp_path"] = rage_mp_path
+            save_settings(settings)
+            # Можно показать сообщение, например, через work_hint_label или QMessageBox
+            self.work_hint_label.setText(f"Настройки сохранены: Rage MP = {rage_mp_path}")
+        else:
+            self.work_hint_label.setText("Ошибка: введите корректный путь до Rage MP")
+
+    def toggle_launch_game(self):
+        # Получаем путь до ярлыка Rage MP, введённый пользователем
+        shortcut_path = self.rage_mp_path_input.text().strip()
+        if not shortcut_path:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Ошибка", "Пожалуйста, введите путь до ярлыка Rage MP!")
+            return
+        # Проверяем, что файл существует и имеет правильное расширение
+        if not os.path.exists(shortcut_path) or not shortcut_path.lower().endswith(".lnk"):
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Ошибка", "Неверный путь или расширение файла! Укажите ярлык (.lnk).")
+            return
+        try:
+            # Запускаем ярлык с правами администратора
+            os.startfile(shortcut_path, "runas")
+            print("Игра запущена через ярлык.")
+        except Exception as e:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Ошибка запуска", f"Не удалось запустить игру: {e}")
 
     def kill_all_bots(self):
         for key in self.processes:
