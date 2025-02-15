@@ -16,7 +16,7 @@ logging.info("Запуск скрипта koleso.")
 
 # Загружаем эталонные изображения
 templates = {
-    "DostupKoleso": cv2.imread('../../../resources/images/ImgKoleso/HomeTest.png', 0),
+    "DostupKoleso": cv2.imread('../../../resources/images/ImgKoleso/DostupKoleso.png', 0),
     "IconCasino": cv2.imread('../../../resources/images/ImgKoleso/IconCasino.png', 0),
     "InterfaceKolesa": cv2.imread('../../../resources/images/ImgKoleso/InterfaceKolesa.png', 0),
     "ButtonKoloso": cv2.imread('../../../resources/images/ImgKoleso/ButtonKoloso.png', 0)
