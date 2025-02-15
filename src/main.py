@@ -6,7 +6,7 @@ import datetime
 import uuid
 import platform
 import hashlib
-import requests  # Для связи с сервером
+import requests
 import json
 
 ##########################
@@ -14,7 +14,8 @@ import json
 ##########################
 import threading
 from flask import Flask, request
-from telegram.ext import Updater, CommandHandler
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, CallbackContext, CallbackQueryHandler, MessageHandler, Filters
 ##########################
 
 from PySide6.QtCore import Qt, QTimer
@@ -1248,48 +1249,104 @@ class MainWindow(QMainWindow):
 ##################### NEW: Flask endpoints, using the window object #####################
 @flask_app.route("/toggle_antiafk", methods=["GET"])
 def route_toggle_antiafk():
-    # Когда приходит GET /toggle_antiafk, вызываем тот же метод, что при нажатии кнопки
+    global window  # если window объявлен как глобальный
     window.toggle_antiafk()
-    return "AntiAFK toggled!", 200
+    return "toggled!", 200
+
 
 ##################### NEW: Функции запуска Flask и Telegram-бота ########################
 def run_flask_server():
     flask_app.run(host="127.0.0.1", port=5001, debug=False, use_reloader=False)
 
 def run_telegram_bot():
-    """Запускаем Telegram-бота, который слушает /start и /antiafk."""
     s = load_settings()
     token = s.get("telegram_token", "")
     if not token:
-        print(">>> Нет 'telegram_token' в settings.json, не запускаем бота.")
+        print("Нет 'telegram_token' в settings.json, не запускаем бота.")
         return
 
     updater = Updater(token, use_context=True)
     dp = updater.dispatcher
 
-    def cmd_start(update, context):
+    # 1. Команда /start
+    def cmd_start(update: Update, context: CallbackContext):
+        # Создаём список списков. Каждая вложенная — это ряд кнопок.
+        # Например, одна строка с тремя кнопками.
+        keyboard = [
+            [KeyboardButton("AntiAFK")],
+            [KeyboardButton("StopAll")]
+        ]
+        reply_markup = ReplyKeyboardMarkup(
+            keyboard,
+            resize_keyboard=True,    # чтобы клавиатура подстраивалась по размеру
+            one_time_keyboard=False  # False = клавиатура остаётся, пока пользователь сам не уберёт
+        )
         update.message.reply_text(
-            "Привет! Это Telegram-бот для управления GargonaBot.\n"
-            "Доступные команды:\n"
-            "/antiafk – Запустить/остановить antiafk"
+            "Привет! Это бот для управления процессами.\n"
+            "Нажми на кнопку, чтобы запустить или остановить процесс:",
+            reply_markup=reply_markup
         )
 
-    def cmd_antiafk(update, context):
-        try:
-            # Шлём запрос на локальный Flask-сервер
-            r = requests.get("http://127.0.0.1:5001/toggle_antiafk")
-            if r.status_code == 200:
-                update.message.reply_text("OK: " + r.text)
-            else:
-                update.message.reply_text(f"Ошибка: {r.status_code} {r.text}")
-        except Exception as e:
-            update.message.reply_text(f"Исключение при запросе: {e}")
-
     dp.add_handler(CommandHandler("start", cmd_start))
-    dp.add_handler(CommandHandler("antiafk", cmd_antiafk))
 
-    print(">>> Telegram-бот запущен. Ожидаем команды...")
+    # 2. Обработчик входящих сообщений с текстом (когда жмут на кнопки, приходит текст)
+    def msg_handler(update: Update, context: CallbackContext):
+        user_text = update.message.text  # что пользователь отправил (нажал)
+        chat_id = update.effective_chat.id
+
+        if user_text == "AntiAFK":
+            # Отправляем запрос к Flask /toggle_antiafk
+            try:
+                r = requests.get("http://127.0.0.1:5001/toggle_antiafk")
+                if r.status_code == 200:
+                    # допустим, возвращает "запущен" или "остановлен"
+                    update.message.reply_text(f"AntiAFK: {r.text}")
+                else:
+                    update.message.reply_text(f"Ошибка: {r.status_code} {r.text}")
+            except Exception as e:
+                update.message.reply_text(f"Исключение: {e}")
+
+        elif user_text == "Cook":
+            try:
+                r = requests.get("http://127.0.0.1:5001/toggle_cook")
+                if r.status_code == 200:
+                    update.message.reply_text(f"Cook: {r.text}")
+                else:
+                    update.message.reply_text(f"Ошибка: {r.status_code} {r.text}")
+            except Exception as e:
+                update.message.reply_text(f"Исключение: {e}")
+
+        elif user_text == "Lottery":
+            try:
+                r = requests.get("http://127.0.0.1:5001/toggle_lottery")
+                if r.status_code == 200:
+                    update.message.reply_text(f"Lottery: {r.text}")
+                else:
+                    update.message.reply_text(f"Ошибка: {r.status_code} {r.text}")
+            except Exception as e:
+                update.message.reply_text(f"Исключение: {e}")
+
+        elif user_text == "StopAll":
+            # Может быть, у вас есть эндпоинт /kill_all_bots
+            try:
+                r = requests.get("http://127.0.0.1:5001/kill_all")
+                update.message.reply_text("Все боты остановлены.")
+            except Exception as e:
+                update.message.reply_text(f"Исключение: {e}")
+
+        else:
+            # Если пришло какое-то неизвестное сообщение
+            update.message.reply_text(
+                "Не понял, что вы хотите. Нажмите на кнопку внизу или /start"
+            )
+
+    dp.add_handler(MessageHandler(Filters.text, msg_handler))
+
+    # Запуск
     updater.start_polling()
+    # НЕ делаем updater.idle() в фоновом потоке
+    print(">>> Telegram-бот запущен (команда /start покажет клавиатуру).")
+
 
 
 #############################
