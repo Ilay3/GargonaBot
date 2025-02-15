@@ -1,40 +1,35 @@
-import ctypes
 import sys
+import requests
+from telegram.ext import Updater, CommandHandler
+
+# Подключаем ParseMode для стилизации HTML
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ParseMode
+
+import ctypes
 import os
 import subprocess
 import datetime
 import uuid
 import platform
 import hashlib
-import requests
 import json
-
-##########################
-# NEW: Импорт для Flask и Telegram
-##########################
 import threading
-from flask import Flask, request
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, CallbackContext, CallbackQueryHandler, MessageHandler, Filters
-##########################
+from telegram.ext import (CallbackContext, MessageHandler, Filters)
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QListWidget, QStackedWidget, QPushButton, QLabel, QLineEdit, QCheckBox, QDialog, QSizePolicy, QMessageBox
+    QListWidget, QStackedWidget, QPushButton, QLabel, QLineEdit, QCheckBox,
+    QDialog, QSizePolicy, QMessageBox
 )
 
-# Сервер для проверки лицензий
 SERVER_URL = "http://83.220.165.162:5000"
-
-# Определяем базовый каталог – где находится main.py.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if os.path.isdir(os.path.join(BASE_DIR, "src")):
     PROJECT_ROOT = BASE_DIR
 else:
     PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
 
-# Файл лицензии и настроек (находятся в корневой папке проекта)
 LICENSE_FILE = os.path.join(PROJECT_ROOT, "license.dat")
 SETTINGS_FILE = os.path.join(PROJECT_ROOT, "settings.json")
 print(f"Используется файл настроек: {SETTINGS_FILE}")
@@ -48,9 +43,7 @@ def get_keyboard_layout():
 
 LANG_ENGLISH = 0x0409
 
-# Функции для работы с настройками
 def load_settings():
-    """Загружает настройки из файла settings.json."""
     if os.path.exists(SETTINGS_FILE):
         try:
             with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
@@ -60,25 +53,21 @@ def load_settings():
     return {}
 
 def save_settings(settings):
-    """Сохраняет настройки в файл settings.json."""
     with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
         json.dump(settings, f, indent=4)
     print("Настройки сохранены.")
 
-# Определяем путь к папке modules (ищется либо в BASE_DIR, либо в BASE_DIR/src)
 MODULES_BASE = None
 if os.path.isdir(os.path.join(BASE_DIR, "modules")):
     MODULES_BASE = os.path.join(BASE_DIR, "modules")
 elif os.path.isdir(os.path.join(BASE_DIR, "src", "modules")):
     MODULES_BASE = os.path.join(BASE_DIR, "src", "modules")
 else:
-    raise FileNotFoundError("Не найдена папка modules в BASE_DIR или BASE_DIR/src")
+    raise FileNotFoundError("Не найдена папка modules")
 
-# Добавляем путь к модулю process_checker.
 sys.path.append(os.path.join(MODULES_BASE, "ProcessChecker"))
 import process_checker
 
-# Абсолютные пути до скриптов (ботов)
 ANTIAFK_PATH     = os.path.join(MODULES_BASE, "AntiAfkService", "antiafk.py")
 KRUTKAKOLES_PATH = os.path.join(MODULES_BASE, "AntiAfkService", "krutkakoles.py")
 LOTTERY_PATH     = os.path.join(MODULES_BASE, "AntiAfkService", "lottery.py")
@@ -88,47 +77,32 @@ PORT_PATH        = os.path.join(MODULES_BASE, "WorkService", "port.py")
 STROYKA_PATH     = os.path.join(MODULES_BASE, "WorkService", "stroyka.py")
 KOZLODOY_PATH    = os.path.join(MODULES_BASE, "WorkService", "kozlodoy.py")
 AUTORUN_PATH     = os.path.join(MODULES_BASE, "OtherService", "autorun.py")
-# Пути к скриптам пассивных функций:
 AUTOMOOD_PATH    = os.path.join(MODULES_BASE, "OtherService", "automood.py")
 AUTOEAT_PATH     = os.path.join(MODULES_BASE, "OtherService", "autoeat.py")
-# Добавляем новый путь для скрипта спортзала (качалки)
 KACHALKA_PATH    = os.path.join(MODULES_BASE, "OtherService", "kachalka.py")
 KOSYAKI_PATH     = os.path.join(MODULES_BASE, "CraftService", "kosyaki.py")
+TAXI_PATH        = os.path.join(MODULES_BASE, "WorkService", "Taxi.py")
+FIREMAN_PATH     = os.path.join(MODULES_BASE, "WorkService", "fireman.py")
+SHVEIKA_PATH     = os.path.join(MODULES_BASE, "MiniGamesService", "Shveika.py")
+SKOLZKAYA_PATH   = os.path.join(MODULES_BASE, "MiniGamesService", "Skolzkaya.py")
+SCHEMS_PATH      = os.path.join(MODULES_BASE, "MiniGamesService", "Schems.py")
+RECONNECT_PATH   = os.path.join(MODULES_BASE, "OtherService", "reconect.py")
+DEMORGAN_PATH = os.path.join(MODULES_BASE, "TuragaService", "ShveiaDemorgan.py")
 
-TAXI_PATH = os.path.join(MODULES_BASE, "WorkService", "Taxi.py")
-FIREMAN_PATH = os.path.join(MODULES_BASE, "WorkService", "fireman.py")
 
-SHVEIKA_PATH = os.path.join(MODULES_BASE, "MiniGamesService", "Shveika.py")
-SKOLZKAYA_PATH = os.path.join(MODULES_BASE, "MiniGamesService", "Skolzkaya.py")
-
-# Используем sys.executable для запуска того же интерпретатора.
 PYTHON_EXEC = sys.executable
 
-########################################################################
-# Функции идентификации устройства
-########################################################################
 def get_device_id():
-    """Возвращает MAC-адрес в виде шестнадцатеричной строки."""
     return hex(uuid.getnode())
 
 def get_hwid():
-    """
-    Вычисляет дополнительный уникальный идентификатор (HWID) на основе:
-      - MAC-адреса,
-      - Имени компьютера,
-      - Информации о процессоре.
-    """
     mac = str(uuid.getnode())
     computer_name = os.environ.get('COMPUTERNAME', 'unknown')
     processor = platform.processor()
     combined = mac + computer_name + processor
     return hashlib.sha256(combined.encode()).hexdigest()
 
-########################################################################
-# Функция проверки ключа через сервер
-########################################################################
 def validate_key(key: str):
-    """Проверяет ключ через сервер."""
     hwid = get_hwid()
     print(f"📤 Отправляем на сервер:\n  Ключ: {key}\n  HWID: {hwid}")
     try:
@@ -147,11 +121,7 @@ def validate_key(key: str):
         print(f"❌ Ошибка подключения к серверу: {e}")
         return False, None
 
-########################################################################
-# Функции загрузки и сохранения лицензии
-########################################################################
 def load_license():
-    """Загружает локальный ключ лицензии и проверяет hwid."""
     if os.path.exists(LICENSE_FILE):
         try:
             with open(LICENSE_FILE, "r") as f:
@@ -169,7 +139,6 @@ def load_license():
     return None
 
 def save_license(key, expiry_date):
-    """Сохраняет лицензию локально."""
     license_info = {
         "key": key,
         "hwid": get_hwid(),
@@ -181,13 +150,6 @@ def save_license(key, expiry_date):
         print(f"💾 Лицензия сохранена: подписка до {expiry_date}")
     except Exception as e:
         print(f"❌ Ошибка при сохранении лицензии: {e}")
-
-flask_app = Flask("LocalControl")
-
-########################################################################
-# Основное окно приложения
-########################################################################
-from PySide6.QtWidgets import QSizePolicy
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -212,14 +174,15 @@ class MainWindow(QMainWindow):
             "fireman": None,
             "shveika": None,
             "skolzkaya": None,
-            "telegram_bot": None
-
+            "telegram_bot": None,
+            "schems": None,
+            "reconnect": None,
+            "demorgan": None
         }
 
         self.inactive_counter = 0
         self.bots_killed_due_to_inactivity = False
 
-        # Загружаем дату окончания лицензии (если лицензия активна)
         self.license_expiry = load_license()
 
         self.license_check_timer = QTimer(self)
@@ -230,12 +193,10 @@ class MainWindow(QMainWindow):
         self.keyboard_timer.timeout.connect(self.check_keyboard_layout)
         self.keyboard_timer.start(10000)
 
-        # Центральный виджет и основной layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
 
-        # Левая панель: меню и метка лицензии
         left_panel = QWidget()
         left_panel.setSizePolicy(left_panel.sizePolicy().horizontalPolicy(), QSizePolicy.Expanding)
         left_layout = QVBoxLayout(left_panel)
@@ -251,12 +212,12 @@ class MainWindow(QMainWindow):
         self.menu_list.addItem("Спортзал")
         self.menu_list.addItem("Контракты")
         self.menu_list.addItem("Настройки")
+        self.menu_list.addItem("Деморган")
         self.menu_list.addItem("Телеграмм")
 
         self.menu_list.currentRowChanged.connect(self.switch_page)
         left_layout.addWidget(self.menu_list)
 
-        # Метка для отображения информации о лицензии
         self.license_label = QLabel()
         self.license_label.setStyleSheet("font-size: 14px; color: #ff7043;")
         left_layout.addWidget(self.license_label)
@@ -264,7 +225,6 @@ class MainWindow(QMainWindow):
 
         main_layout.addWidget(left_panel, 1)
 
-        # Создаем страницы (QStackedWidget)
         self.pages = QStackedWidget()
         self.page_antiafk = self.create_antiafk_page()
         self.page_cook = self.create_cook_page()
@@ -273,8 +233,8 @@ class MainWindow(QMainWindow):
         self.page_sportzal = self.create_sportzal_page()
         self.page_contracts = self.create_contracts_page()
         self.page_settings = self.create_settings_page()
+        self.page_demorgan = self.create_demorgan_page()
         self.tg_page = self.create_tg_page()
-
 
         self.pages.addWidget(self.page_antiafk)
         self.pages.addWidget(self.page_cook)
@@ -283,11 +243,12 @@ class MainWindow(QMainWindow):
         self.pages.addWidget(self.page_sportzal)
         self.pages.addWidget(self.page_contracts)
         self.pages.addWidget(self.page_settings)
+        self.pages.addWidget(self.page_demorgan)
         self.pages.addWidget(self.tg_page)
+
         main_layout.addWidget(self.pages, 3)
         self.switch_page(0)
 
-        # Таймеры
         self.game_timer = QTimer(self)
         self.game_timer.timeout.connect(self.check_game_active)
         self.game_timer.start(1000)
@@ -298,16 +259,16 @@ class MainWindow(QMainWindow):
 
     def check_keyboard_layout(self):
         if get_keyboard_layout() != LANG_ENGLISH:
-            QMessageBox.warning(self, "Внимание!",
-                                "Пожалуйста, переключите раскладку клавиатуры на английскую, наш бот работает только с ней!")
+            QMessageBox.warning(
+                self, "Внимание!",
+                "Пожалуйста, переключите раскладку клавиатуры на английскую, наш бот работает только с ней!"
+            )
 
     def periodic_license_check(self):
-        """Проверяет периодически, не истекла ли лицензия, и завершает работу приложения, если срок действия истёк."""
         if self.license_expiry:
             now = datetime.datetime.now()
             if now >= self.license_expiry:
                 print("❌ Лицензия истекла. Завершение работы приложения.")
-                # Можно вывести диалоговое окно с сообщением
                 error_dialog = QDialog(self)
                 error_dialog.setWindowTitle("Ошибка лицензии")
                 dlg_layout = QVBoxLayout(error_dialog)
@@ -318,7 +279,6 @@ class MainWindow(QMainWindow):
                 QApplication.quit()
 
     def update_license_label(self):
-        """Обновляет метку с информацией о подписке."""
         if self.license_expiry:
             now = datetime.datetime.now()
             remaining = self.license_expiry - now
@@ -360,6 +320,7 @@ class MainWindow(QMainWindow):
             QCheckBox { font-size: 16px; }
         """)
         self.chk_lottery.toggled.connect(self.toggle_lottery)
+
         layout.addWidget(self.chk_lottery)
         layout.addStretch()
         return widget
@@ -469,31 +430,31 @@ class MainWindow(QMainWindow):
         widget = QWidget()
         layout = QVBoxLayout(widget)
 
-        # Заголовок страницы
         title = QLabel("Контракты")
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet("font-size: 20px;")
         layout.addWidget(title)
 
-        # Описание
-        desc = QLabel(
-            "Запустите скрипты для выполнения контрактов.")
+        desc = QLabel("Запустите скрипты для выполнения контрактов.")
         desc.setAlignment(Qt.AlignCenter)
         desc.setWordWrap(True)
         desc.setStyleSheet("font-size: 16px;")
         layout.addWidget(desc)
 
-        # Кнопка для запуска/остановки Shveika
         self.shveika_button = QPushButton("Запустить Швейную фабрику")
         self.shveika_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.shveika_button.clicked.connect(self.toggle_shveika)
         layout.addWidget(self.shveika_button)
 
-        # Кнопка для запуска/остановки Skolzkaya
-        self.skolzkaya_button = QPushButton("Запустить Схемы")
+        self.skolzkaya_button = QPushButton("Запустить Скользкая дорога")
         self.skolzkaya_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.skolzkaya_button.clicked.connect(self.toggle_skolzkaya)
         layout.addWidget(self.skolzkaya_button)
+
+        self.schems_button = QPushButton("Запустить Схемы")
+        self.schems_button.setStyleSheet("font-size: 16px; padding: 10px;")
+        self.schems_button.clicked.connect(self.toggle_schems)
+        layout.addWidget(self.schems_button)
 
         layout.addStretch()
         return widget
@@ -502,13 +463,11 @@ class MainWindow(QMainWindow):
         widget = QWidget()
         layout = QVBoxLayout(widget)
 
-        # Заголовок страницы для пассивных функций
         title = QLabel("Пассивные функции")
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet("font-size: 20px;")
         layout.addWidget(title)
 
-        # --- Секция Automood ---
         automood_instr = QLabel("Настройте функцию Авто-Настроение.")
         automood_instr.setAlignment(Qt.AlignCenter)
         layout.addWidget(automood_instr)
@@ -516,7 +475,7 @@ class MainWindow(QMainWindow):
         automood_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(automood_label)
         self.automood_key_input = QLineEdit()
-        self.automood_key_input.setPlaceholderText("Введите клавишу, например: L (работают только Eng - раскладка)")
+        self.automood_key_input.setPlaceholderText("Введите клавишу, например: L")
         self.automood_key_input.setStyleSheet("font-size: 16px; padding: 5px;")
         layout.addWidget(self.automood_key_input)
 
@@ -525,15 +484,14 @@ class MainWindow(QMainWindow):
         self.automood_launch_button.clicked.connect(self.toggle_automood)
         layout.addWidget(self.automood_launch_button)
 
-        # --- Секция Autorun ---
-        autorun_instr = QLabel("Настройте функцию Авто-Бег (эмуляция нажатия выбранной клавиши для бега).")
+        autorun_instr = QLabel("Настройте функцию Авто-Бег (эмуляция нажатия выбранной клавиши).")
         autorun_instr.setAlignment(Qt.AlignCenter)
         layout.addWidget(autorun_instr)
         autorun_label = QLabel("Клавиша Авто-Бег:")
         autorun_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(autorun_label)
         self.autorun_key_input = QLineEdit()
-        self.autorun_key_input.setPlaceholderText("Введите клавишу, например: J (работают только Eng - раскладка)")
+        self.autorun_key_input.setPlaceholderText("Введите клавишу, например: J")
         self.autorun_key_input.setStyleSheet("font-size: 16px; padding: 5px;")
         layout.addWidget(self.autorun_key_input)
 
@@ -542,15 +500,14 @@ class MainWindow(QMainWindow):
         self.autorun_launch_button.clicked.connect(self.toggle_autorun)
         layout.addWidget(self.autorun_launch_button)
 
-        # --- Секция Autoeat ---
-        autoeat_instr = QLabel("Настройте функцию Авто-Еда (эмуляция нажатия выбранной клавиши при обнаружении недостатка еды).")
+        autoeat_instr = QLabel("Настройте функцию Авто-Еда (эмуляция нажатия клавиши при недостатке еды).")
         autoeat_instr.setAlignment(Qt.AlignCenter)
         layout.addWidget(autoeat_instr)
         autoeat_label = QLabel("Клавиша Авто-Еда:")
         autoeat_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(autoeat_label)
         self.autoeat_key_input = QLineEdit()
-        self.autoeat_key_input.setPlaceholderText("Введите клавишу, например: H (работают только Eng - раскладка)")
+        self.autoeat_key_input.setPlaceholderText("Введите клавишу, например: H")
         self.autoeat_key_input.setStyleSheet("font-size: 16px; padding: 5px;")
         layout.addWidget(self.autoeat_key_input)
 
@@ -559,7 +516,6 @@ class MainWindow(QMainWindow):
         self.autoeat_launch_button.clicked.connect(self.toggle_autoeat)
         layout.addWidget(self.autoeat_launch_button)
 
-        # Загружаем сохранённые настройки для всех функций
         settings = load_settings()
         self.automood_key_input.setText(settings.get("automood_key", "l"))
         self.autorun_key_input.setText(settings.get("autorun_key", "+"))
@@ -567,7 +523,6 @@ class MainWindow(QMainWindow):
 
         layout.addStretch()
 
-        # Общая кнопка для сохранения настроек на этой странице
         self.passive_save_button = QPushButton("Сохранить настройки")
         self.passive_save_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.passive_save_button.clicked.connect(self.save_passive_settings)
@@ -576,24 +531,18 @@ class MainWindow(QMainWindow):
         return widget
 
     def create_sportzal_page(self):
-        """Создает страницу 'Спортзал' для запуска скрипта качалки (kachalka.py)."""
         widget = QWidget()
         layout = QVBoxLayout(widget)
-
-        # Заголовок страницы
         title = QLabel("Спортзал")
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet("font-size: 20px;")
         layout.addWidget(title)
-
-        # Описание (примерное)
-        desc = QLabel("Запустите программу для тренировки мышц. Функция будет эмулировать действия в спортзале.")
+        desc = QLabel("Запустите программу для тренировки мышц в спортзале.")
         desc.setAlignment(Qt.AlignCenter)
         desc.setWordWrap(True)
         desc.setStyleSheet("font-size: 16px;")
         layout.addWidget(desc)
 
-        # Кнопка запуска/остановки скрипта качалки
         self.kachalka_launch_button = QPushButton("Запустить тренировку в спортзале")
         self.kachalka_launch_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.kachalka_launch_button.clicked.connect(self.toggle_kachalka)
@@ -605,21 +554,17 @@ class MainWindow(QMainWindow):
     def create_settings_page(self):
         widget = QWidget()
         layout = QVBoxLayout(widget)
-
-        # Заголовок страницы
         title = QLabel("Настройки")
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet("font-size: 20px;")
         layout.addWidget(title)
 
-        # Описание
         desc = QLabel("Введите путь до файла Rage MP (exe), который будет запускаться.")
         desc.setAlignment(Qt.AlignCenter)
         desc.setWordWrap(True)
         desc.setStyleSheet("font-size: 16px;")
         layout.addWidget(desc)
 
-        # Поле ввода пути
         path_label = QLabel("Путь до Rage MP:")
         path_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(path_label)
@@ -629,18 +574,15 @@ class MainWindow(QMainWindow):
         self.rage_mp_path_input.setStyleSheet("font-size: 16px; padding: 5px;")
         layout.addWidget(self.rage_mp_path_input)
 
-        # Загружаем сохранённые настройки (если они есть) и заполняем поле
         settings = load_settings()
         current_path = settings.get("rage_mp_path", "")
         self.rage_mp_path_input.setText(current_path)
 
-        # Кнопка запуска игры
         self.launch_game_button = QPushButton("Запустить игру")
         self.launch_game_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.launch_game_button.clicked.connect(self.toggle_launch_game)
         layout.addWidget(self.launch_game_button)
 
-        # Кнопка сохранения настроек (опционально, можно объединить с запуском)
         self.settings_save_button = QPushButton("Сохранить настройки")
         self.settings_save_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.settings_save_button.clicked.connect(self.save_settings_page)
@@ -658,8 +600,7 @@ class MainWindow(QMainWindow):
         title.setStyleSheet("font-size: 20px;")
         layout.addWidget(title)
 
-        desc = QLabel(
-            "Введите токен вашего Telegram бота и Chat ID, затем сохраните настройки. При запуске приложения, если настройки заданы, бот автоматически отправит сообщение об успешной авторизации.")
+        desc = QLabel("Введите токен вашего Telegram бота и Chat ID, затем сохраните настройки.")
         desc.setAlignment(Qt.AlignCenter)
         desc.setWordWrap(True)
         desc.setStyleSheet("font-size: 16px;")
@@ -685,16 +626,41 @@ class MainWindow(QMainWindow):
         self.telegram_chat_id_input.setStyleSheet("font-size: 16px; padding: 5px;")
         layout.addWidget(self.telegram_chat_id_input)
 
-        # Загружаем сохранённые настройки и заполняем поля
         settings = load_settings()
         self.telegram_token_input.setText(settings.get("telegram_token", ""))
         self.telegram_chat_id_input.setText(settings.get("telegram_chat_id", ""))
 
-        # Только кнопка сохранения настроек (без кнопки запуска)
         self.tg_save_button = QPushButton("Сохранить настройки")
         self.tg_save_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.tg_save_button.clicked.connect(self.save_tg_settings)
         layout.addWidget(self.tg_save_button)
+
+        layout.addStretch()
+        return widget
+
+    def create_demorgan_page(self):
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+
+        title = QLabel("Деморган")
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("font-size: 20px;")
+        layout.addWidget(title)
+
+        desc = QLabel(
+            "Скрипт для автоматизации процесса в деморгане.\n"
+            "Сканирует экран, ищет нужные изображения и кликает.\n"
+            "При запуске будет работать в фоновом режиме."
+        )
+        desc.setAlignment(Qt.AlignCenter)
+        desc.setWordWrap(True)
+        desc.setStyleSheet("font-size: 16px; color: #555555;")
+        layout.addWidget(desc)
+
+        self.demorgan_button = QPushButton("Запустить Деморган")
+        self.demorgan_button.setStyleSheet("font-size: 16px; padding: 10px;")
+        self.demorgan_button.clicked.connect(self.toggle_demorgan)
+        layout.addWidget(self.demorgan_button)
 
         layout.addStretch()
         return widget
@@ -712,9 +678,7 @@ class MainWindow(QMainWindow):
         else:
             QMessageBox.critical(self, "Ошибка", "Введите корректные значения для токена и Chat ID")
 
-
     def save_passive_settings(self):
-        """Сохраняет настройки для функций Automood, Autorun и Autoeat."""
         automood_key = self.automood_key_input.text().strip()
         autorun_key = self.autorun_key_input.text().strip()
         autoeat_key = self.autoeat_key_input.text().strip()
@@ -731,7 +695,6 @@ class MainWindow(QMainWindow):
             self.work_hint_label.setText("Ошибка: введите корректные клавиши")
 
     def toggle_kosyaki(self):
-        """Запускает или останавливает скрипт kosyaki.py."""
         if self.processes.get("kosyaki") is None:
             wd = os.path.dirname(KOSYAKI_PATH)
             try:
@@ -739,10 +702,11 @@ class MainWindow(QMainWindow):
                 self.processes["kosyaki"] = proc
                 self.kosyaki_button.setText("Остановить создание Косяков")
                 self.kosyaki_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
+                )
                 print("Скрипт kosyaki запущен, PID:", proc.pid)
             except Exception as e:
-                print("Ошибка при запуске скрипта kosyaki:", e)
+                print("Ошибка при запуске kosyaki:", e)
         else:
             try:
                 self.processes["kosyaki"].terminate()
@@ -752,17 +716,18 @@ class MainWindow(QMainWindow):
                 self.kosyaki_button.setStyleSheet("font-size: 16px; padding: 10px;")
                 print("Скрипт kosyaki остановлен.")
             except Exception as e:
-                print("Ошибка при остановке скрипта kosyaki:", e)
+                print("Ошибка при остановке kosyaki:", e)
 
     def toggle_automood(self):
-        """Запускает или останавливает скрипт Automood."""
         if self.processes.get("automood") is None:
             wd = os.path.dirname(AUTOMOOD_PATH)
             try:
                 proc = subprocess.Popen([PYTHON_EXEC, AUTOMOOD_PATH], cwd=wd)
                 self.processes["automood"] = proc
                 self.automood_launch_button.setText("Остановить Авто-Настроение")
-                self.automood_launch_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                self.automood_launch_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
+                )
                 print("Automood запущен, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Automood:", e)
@@ -776,61 +741,18 @@ class MainWindow(QMainWindow):
                 print("Automood остановлен.")
             except Exception as e:
                 print("Ошибка при остановке Automood:", e)
-    def toggle_autorun(self):
-        """Запускает или останавливает скрипт Autorun."""
-        if self.processes.get("autorun") is None:
-            wd = os.path.dirname(AUTORUN_PATH)
-            try:
-                proc = subprocess.Popen([PYTHON_EXEC, AUTORUN_PATH], cwd=wd)
-                self.processes["autorun"] = proc
-                self.autorun_launch_button.setText("Остановить Autorun")
-                self.autorun_launch_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
-                print("Autorun запущен, PID:", proc.pid)
-            except Exception as e:
-                print("Ошибка при запуске Autorun:", e)
-        else:
-            try:
-                self.processes["autorun"].terminate()
-                self.processes["autorun"].wait()
-                self.processes["autorun"] = None
-                self.autorun_launch_button.setText("Запустить Autorun")
-                self.autorun_launch_button.setStyleSheet("font-size: 16px; padding: 10px;")
-                print("Autorun остановлен.")
-            except Exception as e:
-                print("Ошибка при остановке Autorun:", e)
-
-    def toggle_autoeat(self):
-        """Запускает или останавливает скрипт Autoeat."""
-        if self.processes.get("autoeat") is None:
-            wd = os.path.dirname(AUTOEAT_PATH)
-            try:
-                proc = subprocess.Popen([PYTHON_EXEC, AUTOEAT_PATH], cwd=wd)
-                self.processes["autoeat"] = proc
-                self.autoeat_launch_button.setText("Остановить Autoeat")
-                self.autoeat_launch_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
-                print("Autoeat запущен, PID:", proc.pid)
-            except Exception as e:
-                print("Ошибка при запуске Autoeat:", e)
-        else:
-            try:
-                self.processes["autoeat"].terminate()
-                self.processes["autoeat"].wait()
-                self.processes["autoeat"] = None
-                self.autoeat_launch_button.setText("Запустить Autoeat")
-                self.autoeat_launch_button.setStyleSheet("font-size: 16px; padding: 10px;")
-                print("Autoeat остановлен.")
-            except Exception as e:
-                print("Ошибка при остановке Autoeat:", e)
 
     def toggle_autorun(self):
-        """Запускает или останавливает скрипт Autorun."""
         if self.processes.get("autorun") is None:
             wd = os.path.dirname(AUTORUN_PATH)
             try:
                 proc = subprocess.Popen([PYTHON_EXEC, AUTORUN_PATH], cwd=wd)
                 self.processes["autorun"] = proc
                 self.autorun_launch_button.setText("Остановить Авто-Бег")
-                self.autorun_launch_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                self.autorun_launch_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
+                )
+                self.chk_autorun.setChecked(True)
                 print("Autorun запущен, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Autorun:", e)
@@ -841,19 +763,21 @@ class MainWindow(QMainWindow):
                 self.processes["autorun"] = None
                 self.autorun_launch_button.setText("Запустить Авто-Бег")
                 self.autorun_launch_button.setStyleSheet("font-size: 16px; padding: 10px;")
+                self.chk_autorun.setChecked(False)
                 print("Autorun остановлен.")
             except Exception as e:
                 print("Ошибка при остановке Autorun:", e)
 
     def toggle_autoeat(self):
-        """Запускает или останавливает скрипт Autoeat."""
         if self.processes.get("autoeat") is None:
             wd = os.path.dirname(AUTOEAT_PATH)
             try:
                 proc = subprocess.Popen([PYTHON_EXEC, AUTOEAT_PATH], cwd=wd)
                 self.processes["autoeat"] = proc
                 self.autoeat_launch_button.setText("Остановить Авто-Еда")
-                self.autoeat_launch_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                self.autoeat_launch_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
+                )
                 print("Autoeat запущен, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Autoeat:", e)
@@ -881,7 +805,6 @@ class MainWindow(QMainWindow):
             self.antiafk_button.setStyleSheet("font-size: 16px; padding: 10px;")
 
     def toggle_koleso(self, checked):
-        print("toggle_koleso toggled:", checked)
         if checked:
             wd = os.path.dirname(KRUTKAKOLES_PATH)
             try:
@@ -901,7 +824,6 @@ class MainWindow(QMainWindow):
                 self.processes["koleso"] = None
 
     def toggle_lottery(self, checked):
-        print("toggle_lottery toggled:", checked)
         if checked:
             wd = os.path.dirname(LOTTERY_PATH)
             try:
@@ -945,7 +867,9 @@ class MainWindow(QMainWindow):
                 proc = subprocess.Popen([PYTHON_EXEC, WAXTA_PATH], cwd=wd)
                 self.processes["waxta"] = proc
                 self.waxta_button.setText("Остановить работу на Шахте")
-                self.waxta_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                self.waxta_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
+                )
                 print("Waxta запущена, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Шахты:", e)
@@ -967,7 +891,9 @@ class MainWindow(QMainWindow):
                 proc = subprocess.Popen([PYTHON_EXEC, PORT_PATH], cwd=wd)
                 self.processes["port"] = proc
                 self.port_button.setText("Остановить работу в Порту")
-                self.port_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                self.port_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
+                )
                 print("Port запущена, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Port:", e)
@@ -989,7 +915,9 @@ class MainWindow(QMainWindow):
                 proc = subprocess.Popen([PYTHON_EXEC, STROYKA_PATH], cwd=wd)
                 self.processes["stroyka"] = proc
                 self.stroyka_button.setText("Остановить работу на Стройке")
-                self.stroyka_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                self.stroyka_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
+                )
                 print("Стройка запущена, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Стройки:", e)
@@ -1011,7 +939,9 @@ class MainWindow(QMainWindow):
                 proc = subprocess.Popen([PYTHON_EXEC, KOZLODOY_PATH], cwd=wd)
                 self.processes["kozlodoy"] = proc
                 self.kozlodoy_button.setText("Остановить работу на Ферме")
-                self.kozlodoy_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                self.kozlodoy_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
+                )
                 print("Работа на Ферме запущена, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске работы на Ферме:", e)
@@ -1027,7 +957,6 @@ class MainWindow(QMainWindow):
                 print("Ошибка при остановке работы на Ферме:", e)
 
     def toggle_taxi(self):
-        """Запускает или останавливает скрипт Taxi."""
         if self.processes.get("taxi") is None:
             wd = os.path.dirname(TAXI_PATH)
             try:
@@ -1035,7 +964,8 @@ class MainWindow(QMainWindow):
                 self.processes["taxi"] = proc
                 self.taxi_button.setText("Остановить работу Таксистом")
                 self.taxi_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
+                )
                 print("Taxi запущен, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Taxi:", e)
@@ -1051,7 +981,6 @@ class MainWindow(QMainWindow):
                 print("Ошибка при остановке Taxi:", e)
 
     def toggle_fireman(self):
-        """Запускает или останавливает скрипт Fireman."""
         if self.processes.get("fireman") is None:
             wd = os.path.dirname(FIREMAN_PATH)
             try:
@@ -1059,7 +988,8 @@ class MainWindow(QMainWindow):
                 self.processes["fireman"] = proc
                 self.fireman_button.setText("Остановить работу Пожарным")
                 self.fireman_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
+                )
                 print("Fireman запущен, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Fireman:", e)
@@ -1075,14 +1005,15 @@ class MainWindow(QMainWindow):
                 print("Ошибка при остановке Fireman:", e)
 
     def toggle_kachalka(self):
-        """Запускает или останавливает скрипт Спортзала (kachalka.py)."""
         if self.processes.get("kachalka") is None:
             wd = os.path.dirname(KACHALKA_PATH)
             try:
                 proc = subprocess.Popen([PYTHON_EXEC, KACHALKA_PATH], cwd=wd)
                 self.processes["kachalka"] = proc
                 self.kachalka_launch_button.setText("Остановить Спортзал")
-                self.kachalka_launch_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                self.kachalka_launch_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
+                )
                 print("Спортзал запущен (kachalka), PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Спортзала (kachalka):", e)
@@ -1098,7 +1029,6 @@ class MainWindow(QMainWindow):
                 print("Ошибка при остановке Спортзала (kachalka):", e)
 
     def toggle_shveika(self):
-        """Запускает или останавливает скрипт Shveika."""
         if self.processes.get("shveika") is None:
             wd = os.path.dirname(SHVEIKA_PATH)
             try:
@@ -1106,7 +1036,8 @@ class MainWindow(QMainWindow):
                 self.processes["shveika"] = proc
                 self.shveika_button.setText("Остановить пошив Одежды")
                 self.shveika_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
+                )
                 print("Shveika запущен, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Shveika:", e)
@@ -1122,15 +1053,15 @@ class MainWindow(QMainWindow):
                 print("Ошибка при остановке Shveika:", e)
 
     def toggle_skolzkaya(self):
-        """Запускает или останавливает скрипт Skolzkaya."""
         if self.processes.get("skolzkaya") is None:
             wd = os.path.dirname(SKOLZKAYA_PATH)
             try:
                 proc = subprocess.Popen([PYTHON_EXEC, SKOLZKAYA_PATH], cwd=wd)
                 self.processes["skolzkaya"] = proc
-                self.skolzkaya_button.setText("Остановить Схемы")
+                self.skolzkaya_button.setText("Остановить Скользкая дорога")
                 self.skolzkaya_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
+                )
                 print("Skolzkaya запущен, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Skolzkaya:", e)
@@ -1139,11 +1070,55 @@ class MainWindow(QMainWindow):
                 self.processes["skolzkaya"].terminate()
                 self.processes["skolzkaya"].wait()
                 self.processes["skolzkaya"] = None
-                self.skolzkaya_button.setText("Запустить Схемы")
+                self.skolzkaya_button.setText("Запустить Скользкая дорога")
                 self.skolzkaya_button.setStyleSheet("font-size: 16px; padding: 10px;")
                 print("Skolzkaya остановлен.")
             except Exception as e:
                 print("Ошибка при остановке Skolzkaya:", e)
+
+    def toggle_schems(self):
+        if self.processes.get("schems") is None:
+            wd = os.path.dirname(SCHEMS_PATH)
+            try:
+                proc = subprocess.Popen([PYTHON_EXEC, SCHEMS_PATH], cwd=wd)
+                self.processes["schems"] = proc
+                self.schems_button.setText("Остановить Схемы")
+                self.schems_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
+                )
+                print("schems запущен, PID:", proc.pid)
+            except Exception as e:
+                print("Ошибка при запуске schems:", e)
+        else:
+            try:
+                self.processes["schems"].terminate()
+                self.processes["schems"].wait()
+                self.processes["schems"] = None
+                self.schems_button.setText("Запустить Схемы")
+                self.schems_button.setStyleSheet("font-size: 16px; padding: 10px;")
+                print("schems остановлен.")
+            except Exception as e:
+                print("Ошибка при остановке schems:", e)
+
+    def toggle_reconnect(self):
+        if self.processes.get("reconnect") is not None:
+            proc = self.processes["reconnect"]
+            try:
+                proc.terminate()
+                proc.wait()
+                self.processes["reconnect"] = None
+                print("Reconnect остановлен.")
+            except Exception as e:
+                print("Ошибка при остановке reconnect:", e)
+        else:
+            try:
+                settings_path = os.path.join(PROJECT_ROOT, "settings.json")
+                proc = subprocess.Popen([PYTHON_EXEC, RECONNECT_PATH, settings_path],
+                                        cwd=os.path.dirname(RECONNECT_PATH))
+                self.processes["reconnect"] = proc
+                print("Reconnect запущен, PID:", proc.pid)
+            except Exception as e:
+                print("Ошибка запуска reconnect:", e)
 
     def check_game_active(self):
         if process_checker.is_game_active():
@@ -1169,19 +1144,42 @@ class MainWindow(QMainWindow):
     def toggle_launch_game(self):
         shortcut_path = self.rage_mp_path_input.text().strip()
         if not shortcut_path:
-            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, "Ошибка", "Пожалуйста, введите путь до ярлыка Rage MP!")
             return
         if not os.path.exists(shortcut_path) or not shortcut_path.lower().endswith(".lnk"):
-            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, "Ошибка", "Неверный путь или расширение файла! Укажите ярлык (.lnk).")
             return
         try:
             os.startfile(shortcut_path, "runas")
             print("Игра запущена через ярлык.")
         except Exception as e:
-            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, "Ошибка запуска", f"Не удалось запустить игру: {e}")
+
+    def toggle_demorgan(self):
+        if self.processes["demorgan"] is None:
+            # Запускаем
+            wd = os.path.dirname(DEMORGAN_PATH)
+            try:
+                proc = subprocess.Popen([PYTHON_EXEC, DEMORGAN_PATH], cwd=wd)
+                self.processes["demorgan"] = proc
+                self.demorgan_button.setText("Остановить Деморган")
+                self.demorgan_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
+                )
+                print("Деморган запущен, PID:", proc.pid)
+            except Exception as e:
+                print("Ошибка при запуске Деморган:", e)
+        else:
+            # Останавливаем
+            try:
+                self.processes["demorgan"].terminate()
+                self.processes["demorgan"].wait()
+                self.processes["demorgan"] = None
+                self.demorgan_button.setText("Запустить Деморган")
+                self.demorgan_button.setStyleSheet("font-size: 16px; padding: 10px;")
+                print("Деморган остановлен.")
+            except Exception as e:
+                print("Ошибка при остановке Деморган:", e)
 
 
     def kill_all_bots(self):
@@ -1205,7 +1203,7 @@ class MainWindow(QMainWindow):
         self.port_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.stroyka_button.setText("Запустить работу на Стройке")
         self.stroyka_button.setStyleSheet("font-size: 16px; padding: 10px;")
-        self.kozlodoy_button.setText("Запустить Козлодой")
+        self.kozlodoy_button.setText("Запустить работу на Ферме")
         self.kozlodoy_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.chk_koleso.setChecked(False)
         self.chk_lottery.setChecked(False)
@@ -1213,169 +1211,98 @@ class MainWindow(QMainWindow):
             self.chk_autorun.setChecked(False)
         self.work_hint_label.setText("")
 
-##################### NEW: Flask endpoints, using the window object #####################
-@flask_app.route("/toggle_antiafk", methods=["GET"])
-def route_toggle_antiafk():
-    global window
-    # Допустим, antiafk считается «запущенным», если window.processes["antiafk"] не None
-    was_running = (window.processes["antiafk"] is not None)
-    window.toggle_antiafk()  # это «переключает» состояние
-    is_running = (window.processes["antiafk"] is not None)
-
-    if not was_running and is_running:
-        return "запущено", 200
-    elif was_running and not is_running:
-        return "остановлено", 200
-    else:
-        return "toggled!", 200
-
-
-@flask_app.route("/toggle_koleso", methods=["GET"])
-def route_toggle_koleso():
-    global window
-    was_running = (window.processes["koleso"] is not None)
-    if was_running:
-        # Останавливаем
-        try:
-            window.processes["koleso"].terminate()
-            window.processes["koleso"].wait()
-            window.processes["koleso"] = None
-            return "остановлено", 200
-        except:
-            return "ошибка при остановке", 200
-    else:
-        # Запускаем
-        wd = os.path.dirname(KRUTKAKOLES_PATH)
-        try:
-            proc = subprocess.Popen([PYTHON_EXEC, KRUTKAKOLES_PATH], cwd=wd)
-            window.processes["koleso"] = proc
-            return "запущено", 200
-        except:
-            return "ошибка при запуске", 200
-
-@flask_app.route("/toggle_lottery", methods=["GET"])
-def route_toggle_lottery():
-    global window
-    was_running = (window.processes["lottery"] is not None)
-    if was_running:
-        # Останавливаем
-        try:
-            window.processes["lottery"].terminate()
-            window.processes["lottery"].wait()
-            window.processes["lottery"] = None
-            return "остановлено", 200
-        except:
-            return "ошибка при остановке", 200
-    else:
-        # Запускаем
-        wd = os.path.dirname(LOTTERY_PATH)
-        try:
-            proc = subprocess.Popen([PYTHON_EXEC, LOTTERY_PATH], cwd=wd)
-            window.processes["lottery"] = proc
-            return "запущено", 200
-        except:
-            return "ошибка при запуске", 200
-
-
-@flask_app.route("/toggle_reconnect", methods=["GET"])
-def route_toggle_reconnect():
-    global window
-
-    # Проверим, запущен ли уже reconnect
-    if window.processes.get("reconnect") is not None:
-        # Останавливаем
-        proc = window.processes["reconnect"]
-        try:
-            proc.terminate()  # Грубое завершение
-            proc.wait()
-            window.processes["reconnect"] = None
-            return "остановлено", 200
-        except:
-            return "ошибка при остановке", 200
-    else:
-
-        try:
-            script_path = os.path.join(MODULES_BASE, "OtherService", "reconect.py")
-
-            # или где у вас лежит reconnect.py
-            settings_path = os.path.join(PROJECT_ROOT, "settings.json")
-
-            proc = subprocess.Popen(
-                [PYTHON_EXEC, script_path, settings_path],
-                cwd=os.path.dirname(script_path)
-            )
-            window.processes["reconnect"] = proc
-            return "запущено", 200
-        except Exception as e:
-            print("Ошибка запуска reconnect:", e)
-            return "ошибка при запуске", 200
-
-##################### NEW: Функции запуска Flask и Telegram-бота ########################
-def run_flask_server():
-    flask_app.run(host="127.0.0.1", port=5001, debug=False, use_reloader=False)
-
 def run_telegram_bot():
     s = load_settings()
     token = s.get("telegram_token", "")
     if not token:
-        print(">>> Нет 'telegram_token' в settings.json, не запускаем бота.")
+        print(">>> Нет 'telegram_token' в settings.json, бот не запустится.")
         return
 
     updater = Updater(token, use_context=True)
     dp = updater.dispatcher
 
     def cmd_start(update: Update, context: CallbackContext):
+        # Красивая кнопочная клавиатура с эмодзи
         keyboard = [
-            [KeyboardButton("Anti-AFK"), KeyboardButton("Крутка колеса"), KeyboardButton("Лотерея")],
-            [KeyboardButton("Реконнект")]  # <-- новая кнопка
+            [KeyboardButton("🎯 Anti-AFK"), KeyboardButton("🎡 Крутка колеса"), KeyboardButton("🎟 Лотерея")],
+            [KeyboardButton("♻️ Реконнект")],
         ]
-        reply_markup = ReplyKeyboardMarkup(
-            keyboard,
-            resize_keyboard=True,
-            one_time_keyboard=False
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
+
+        text = (
+            "<b>Привет!</b> Я бот управления сервисами.\n"
+            "Выберите действие, нажав кнопку внизу.\n\n"
+            "<i>Список команд:</i>\n"
+            "• Anti-AFK — запустить/остановить систему анти-АФК\n"
+            "• Авто-колесо — провернуть колесо удачи\n"
+            "• Лотерея — запустить/остановить лотерею\n"
+            "• Реконнект — перезапустить игру при вылете\n"
         )
-        update.message.reply_text(
-            "Привет! Выберите действие:",
-            reply_markup=reply_markup
-        )
+        update.message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
 
     dp.add_handler(CommandHandler("start", cmd_start))
 
     def msg_handler(update: Update, context: CallbackContext):
+        global window
         text = update.message.text
 
-        if text == "Anti-AFK":
-            requests.get("http://127.0.0.1:5001/toggle_antiafk")
+        if text == "🎯 Anti-AFK":
+            window.toggle_antiafk()
+            status = "запущен" if window.processes["antiafk"] else "остановлен"
+            update.message.reply_text(
+                f"<b>Anti-AFK</b>: {status}",
+                parse_mode=ParseMode.HTML
+            )
 
-        elif text == "Крутка колеса":
-            requests.get("http://127.0.0.1:5001/toggle_koleso")
+        elif text == "🎡 Авто-колесо":
+            if window.processes["koleso"] is None:
+                window.toggle_koleso(True)
+                update.message.reply_text(
+                    "🎡 <b>Авто-колесо</b> запущена.",
+                    parse_mode=ParseMode.HTML
+                )
+            else:
+                window.toggle_koleso(False)
+                update.message.reply_text(
+                    "🎡 <b>Авто-колесо</b> остановлена.",
+                    parse_mode=ParseMode.HTML
+                )
 
-        elif text == "Лотерея":
-            requests.get("http://127.0.0.1:5001/toggle_lottery")
+        elif text == "🎟 Лотерея":
+            if window.processes["lottery"] is None:
+                window.toggle_lottery(True)
+                update.message.reply_text(
+                    "🎟 <b>Лотерея</b> запущена.",
+                    parse_mode=ParseMode.HTML
+                )
+            else:
+                window.toggle_lottery(False)
+                update.message.reply_text(
+                    "🎟 <b>Лотерея</b> остановлена.",
+                    parse_mode=ParseMode.HTML
+                )
 
-        elif text == "Реконнект":
-            try:
-                r = requests.get("http://127.0.0.1:5001/toggle_reconnect")
-                update.message.reply_text(f"Реконнект: {r.text}")
-            except Exception as e:
-                update.message.reply_text(f"Ошибка: {e}")
+        elif text == "♻️ Реконнект":
+            window.toggle_reconnect()
+            if window.processes["reconnect"] is None:
+                update.message.reply_text("♻️ <b>Реконнект</b> остановлен.", parse_mode=ParseMode.HTML)
+            else:
+                update.message.reply_text("♻️ <b>Реконнект</b> запущен.", parse_mode=ParseMode.HTML)
 
         else:
-            update.message.reply_text("Не понял команду. Нажмите /start.")
+            update.message.reply_text(
+                "Неизвестная команда. Нажмите /start, чтобы открыть меню.",
+                parse_mode=ParseMode.HTML
+            )
 
-    dp.add_handler(MessageHandler(Filters.text, msg_handler))
-
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, msg_handler))
     updater.start_polling()
 
-#############################
-# Основная точка входа
-#############################
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     license_valid = False
 
     expiry_date = load_license()
-
     if expiry_date:
         now = datetime.datetime.now()
         if expiry_date > now:
@@ -1386,7 +1313,6 @@ if __name__ == "__main__":
     else:
         print("❌ Ключ не найден. Требуется активация!")
 
-    # 3️⃣ Если подписка недействительна, запрашиваем ключ
     if not license_valid:
         license_dialog = QDialog()
         license_dialog.setWindowTitle("Аутентификация")
@@ -1416,11 +1342,9 @@ if __name__ == "__main__":
                 message_label.setText("❌ Ошибка активации. Проверьте ключ.")
 
         activate_button.clicked.connect(on_activate)
-
         if license_dialog.exec() != QDialog.Accepted:
             print("❌ Активация не завершена. Выход...")
             sys.exit(1)
-
         license_valid = True
 
     if not license_valid:
@@ -1433,13 +1357,8 @@ if __name__ == "__main__":
     window.setGeometry(100, 100, 900, 600)
     window.show()
 
-    ################# NEW: Запуск Flask и Telegram-бота в отдельных потоках #################
-    flask_thread = threading.Thread(target=run_flask_server, daemon=True)
-    flask_thread.start()
-    print(">>> Flask-сервер запущен на 127.0.0.1:5001")
-
     tg_thread = threading.Thread(target=run_telegram_bot, daemon=True)
     tg_thread.start()
-    print(">>> Telegram-бот запущен (команды /start, /antiafk)")
+    print(">>> Telegram-бот запущен (используйте /start)")
 
     sys.exit(app.exec())
