@@ -49,8 +49,3 @@ def find_and_move():
 
         # Немного ждем перед следующим циклом
         time.sleep(0.001)
-
-
-# Запуск
-if __name__ == '__main__':
-    find_and_move()

@@ -20,7 +20,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QListWidget, QStackedWidget, QPushButton, QLabel, QLineEdit, QCheckBox,
-    QDialog, QSizePolicy, QMessageBox
+    QDialog, QSizePolicy, QMessageBox, QComboBox
 )
 
 SERVER_URL = "http://83.220.165.162:5000"
@@ -88,6 +88,7 @@ SKOLZKAYA_PATH   = os.path.join(MODULES_BASE, "MiniGamesService", "Skolzkaya.py"
 SCHEMS_PATH      = os.path.join(MODULES_BASE, "MiniGamesService", "Schems.py")
 RECONNECT_PATH   = os.path.join(MODULES_BASE, "OtherService", "reconect.py")
 DEMORGAN_PATH = os.path.join(MODULES_BASE, "TuragaService", "ShveiaDemorgan.py")
+TOCHILKA_PATH = os.path.join(MODULES_BASE, "TuragaService", "Tochilka.py")
 
 
 PYTHON_EXEC = sys.executable
@@ -177,7 +178,8 @@ class MainWindow(QMainWindow):
             "telegram_bot": None,
             "schems": None,
             "reconnect": None,
-            "demorgan": None
+            "demorgan": None,
+            "tochilka": None
         }
 
         self.inactive_counter = 0
@@ -320,6 +322,17 @@ class MainWindow(QMainWindow):
             QCheckBox { font-size: 16px; }
         """)
         self.chk_lottery.toggled.connect(self.toggle_lottery)
+
+        self.chk_myservice = QCheckBox("Reconnect")
+        self.chk_myservice.setStyleSheet("""
+                QCheckBox::indicator { width: 15px; height: 15px; }
+                QCheckBox::indicator:unchecked { background-color: #bdbdbd; border: 2px solid #757575; border-radius: 7px; }
+                QCheckBox::indicator:checked { background-color: #ff7043; border: 2px solid #ffa726; border-radius: 7px; }
+                QCheckBox { font-size: 16px; }
+            """)
+        # Здесь исправлено: передаём функцию без вызова
+        self.chk_myservice.toggled.connect(self.toggle_reconnect)
+        layout.addWidget(self.chk_myservice)
 
         layout.addWidget(self.chk_lottery)
         layout.addStretch()
@@ -554,17 +567,52 @@ class MainWindow(QMainWindow):
     def create_settings_page(self):
         widget = QWidget()
         layout = QVBoxLayout(widget)
+
         title = QLabel("Настройки")
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet("font-size: 20px;")
         layout.addWidget(title)
 
-        desc = QLabel("Введите путь до файла Rage MP (exe), который будет запускаться.")
-        desc.setAlignment(Qt.AlignCenter)
-        desc.setWordWrap(True)
-        desc.setStyleSheet("font-size: 16px;")
-        layout.addWidget(desc)
+        # Поле для ввода пароля
+        password_label = QLabel("Пароль:")
+        password_label.setAlignment(Qt.AlignCenter)
+        password_label.setStyleSheet("font-size: 16px;")
+        layout.addWidget(password_label)
 
+        self.password_input = QLineEdit()
+        self.password_input.setPlaceholderText("Введите пароль")
+        self.password_input.setEchoMode(QLineEdit.Password)
+        self.password_input.setStyleSheet("font-size: 16px; padding: 5px;")
+        layout.addWidget(self.password_input)
+
+        # Комбобокс для выбора персонажа (отображаем русские слова)
+        character_label = QLabel("Персонаж:")
+        character_label.setAlignment(Qt.AlignCenter)
+        character_label.setStyleSheet("font-size: 16px;")
+        layout.addWidget(character_label)
+
+        self.character_combo = QComboBox()
+        self.character_combo.setStyleSheet("font-size: 16px; padding: 5px;")
+        # Заполняем комбобокс отображаемыми значениями
+        character_display = {"First": "Первый", "Second": "Второй", "Third": "Третий"}
+        for key, value in character_display.items():
+            self.character_combo.addItem(value, key)  # value для показа, key – данные
+        layout.addWidget(self.character_combo)
+
+        # Комбобокс для выбора точки спауна (русские слова)
+        spawn_label = QLabel("Точка спауна:")
+        spawn_label.setAlignment(Qt.AlignCenter)
+        spawn_label.setStyleSheet("font-size: 16px;")
+        layout.addWidget(spawn_label)
+
+        self.spawn_combo = QComboBox()
+        self.spawn_combo.setStyleSheet("font-size: 16px; padding: 5px;")
+        spawn_display = {"Dom": "Дом", "Kvartira": "Квартира", "Spawn": "Спавн", "Lasttochka": "Последняя точка"}
+        for key, value in spawn_display.items():
+            self.spawn_combo.addItem(value, key)
+        layout.addWidget(self.spawn_combo)
+
+        # Например, поле для Rage MP остается как было
         path_label = QLabel("Путь до Rage MP:")
         path_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(path_label)
@@ -574,14 +622,21 @@ class MainWindow(QMainWindow):
         self.rage_mp_path_input.setStyleSheet("font-size: 16px; padding: 5px;")
         layout.addWidget(self.rage_mp_path_input)
 
+        # Загрузка существующих настроек
         settings = load_settings()
-        current_path = settings.get("rage_mp_path", "")
-        self.rage_mp_path_input.setText(current_path)
+        self.password_input.setText(settings.get("password", ""))
+        # Для комбобоксов используем метод, возвращающий данные (второй аргумент)
+        current_char = settings.get("character", "First")
+        index = self.character_combo.findData(current_char)
+        if index >= 0:
+            self.character_combo.setCurrentIndex(index)
 
-        self.launch_game_button = QPushButton("Запустить игру")
-        self.launch_game_button.setStyleSheet("font-size: 16px; padding: 10px;")
-        self.launch_game_button.clicked.connect(self.toggle_launch_game)
-        layout.addWidget(self.launch_game_button)
+        current_spawn = settings.get("spawn", "Dom")
+        index = self.spawn_combo.findData(current_spawn)
+        if index >= 0:
+            self.spawn_combo.setCurrentIndex(index)
+
+        self.rage_mp_path_input.setText(settings.get("rage_mp_path", ""))
 
         self.settings_save_button = QPushButton("Сохранить настройки")
         self.settings_save_button.setStyleSheet("font-size: 16px; padding: 10px;")
@@ -642,25 +697,47 @@ class MainWindow(QMainWindow):
         widget = QWidget()
         layout = QVBoxLayout(widget)
 
-        title = QLabel("Деморган")
+        # ----- Блок Demorgan -----
+        title = QLabel("Пошив Формы")
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet("font-size: 20px;")
         layout.addWidget(title)
 
         desc = QLabel(
-            "Скрипт для автоматизации процесса в деморгане.\n"
-            "Сканирует экран, ищет нужные изображения и кликает.\n"
-            "При запуске будет работать в фоновом режиме."
+            "Скрипт для автоматизации процесса в деморгане."
         )
         desc.setAlignment(Qt.AlignCenter)
         desc.setWordWrap(True)
         desc.setStyleSheet("font-size: 16px; color: #555555;")
         layout.addWidget(desc)
 
-        self.demorgan_button = QPushButton("Запустить Деморган")
+        self.demorgan_button = QPushButton("Запустить Пошив Формы")
         self.demorgan_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.demorgan_button.clicked.connect(self.toggle_demorgan)
         layout.addWidget(self.demorgan_button)
+
+        # ----- Блок Tochilka -----
+        # Можно добавить небольшой разделитель (необязательно)
+        sep_label = QLabel(" ")
+        layout.addWidget(sep_label)
+
+        tochilka_title = QLabel("Токарка")
+        tochilka_title.setAlignment(Qt.AlignCenter)
+        tochilka_title.setStyleSheet("font-size: 20px; margin-top: 20px;")
+        layout.addWidget(tochilka_title)
+
+        tochilka_desc = QLabel(
+            "Скрипт для заточки предметов (пример описания)."
+        )
+        tochilka_desc.setAlignment(Qt.AlignCenter)
+        tochilka_desc.setWordWrap(True)
+        tochilka_desc.setStyleSheet("font-size: 16px; color: #555555;")
+        layout.addWidget(tochilka_desc)
+
+        self.tochilka_button = QPushButton("Запустить Точилку")
+        self.tochilka_button.setStyleSheet("font-size: 16px; padding: 10px;")
+        self.tochilka_button.clicked.connect(self.toggle_tochilka)
+        layout.addWidget(self.tochilka_button)
 
         layout.addStretch()
         return widget
@@ -841,6 +918,7 @@ class MainWindow(QMainWindow):
                 except Exception as e:
                     print("Ошибка при остановке Лотереи:", e)
                 self.processes["lottery"] = None
+
 
     def toggle_cook(self):
         if self.processes["cook"] is None:
@@ -1100,17 +1178,8 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 print("Ошибка при остановке schems:", e)
 
-    def toggle_reconnect(self):
-        if self.processes.get("reconnect") is not None:
-            proc = self.processes["reconnect"]
-            try:
-                proc.terminate()
-                proc.wait()
-                self.processes["reconnect"] = None
-                print("Reconnect остановлен.")
-            except Exception as e:
-                print("Ошибка при остановке reconnect:", e)
-        else:
+    def toggle_reconnect(self, checked):
+        if checked:
             try:
                 settings_path = os.path.join(PROJECT_ROOT, "settings.json")
                 proc = subprocess.Popen([PYTHON_EXEC, RECONNECT_PATH, settings_path],
@@ -1119,6 +1188,16 @@ class MainWindow(QMainWindow):
                 print("Reconnect запущен, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка запуска reconnect:", e)
+        else:
+            if self.processes.get("reconnect") is not None:
+                try:
+                    proc = self.processes["reconnect"]
+                    proc.terminate()
+                    proc.wait()
+                    self.processes["reconnect"] = None
+                    print("Reconnect остановлен.")
+                except Exception as e:
+                    print("Ошибка при остановке reconnect:", e)
 
     def check_game_active(self):
         if process_checker.is_game_active():
@@ -1135,7 +1214,10 @@ class MainWindow(QMainWindow):
         rage_mp_path = self.rage_mp_path_input.text().strip()
         if rage_mp_path:
             settings = load_settings()
-            settings["rage_mp_path"] = rage_mp_path
+            settings["password"] = self.password_input.text().strip()
+            settings["character"] = self.character_combo.currentText()
+            settings["spawn"] = self.spawn_combo.currentText()
+            settings["rage_mp_path"] = self.rage_mp_path_input.text().strip()
             save_settings(settings)
             self.work_hint_label.setText(f"Настройки сохранены: Rage MP = {rage_mp_path}")
         else:
@@ -1162,25 +1244,48 @@ class MainWindow(QMainWindow):
             try:
                 proc = subprocess.Popen([PYTHON_EXEC, DEMORGAN_PATH], cwd=wd)
                 self.processes["demorgan"] = proc
-                self.demorgan_button.setText("Остановить Деморган")
+                self.demorgan_button.setText("Остановить Пошив формы")
                 self.demorgan_button.setStyleSheet(
                     "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
                 )
-                print("Деморган запущен, PID:", proc.pid)
+                print("Пошив формы запущен, PID:", proc.pid)
             except Exception as e:
-                print("Ошибка при запуске Деморган:", e)
+                print("Ошибка при запуске Пошив формы:", e)
         else:
             # Останавливаем
             try:
                 self.processes["demorgan"].terminate()
                 self.processes["demorgan"].wait()
                 self.processes["demorgan"] = None
-                self.demorgan_button.setText("Запустить Деморган")
+                self.demorgan_button.setText("Запустить Пошив формы")
                 self.demorgan_button.setStyleSheet("font-size: 16px; padding: 10px;")
-                print("Деморган остановлен.")
+                print("Пошив формы остановлен.")
             except Exception as e:
-                print("Ошибка при остановке Деморган:", e)
+                print("Ошибка при остановке Пошив формы:", e)
 
+    def toggle_tochilka(self):
+        if self.processes["tochilka"] is None:
+            wd = os.path.dirname(TOCHILKA_PATH)
+            try:
+                proc = subprocess.Popen([PYTHON_EXEC, TOCHILKA_PATH], cwd=wd)
+                self.processes["tochilka"] = proc
+                self.tochilka_button.setText("Остановить Токарку")
+                self.tochilka_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
+                )
+                print("Точилка запущена, PID:", proc.pid)
+            except Exception as e:
+                print("Ошибка при запуске Точилки:", e)
+        else:
+            try:
+                self.processes["tochilka"].terminate()
+                self.processes["tochilka"].wait()
+                self.processes["tochilka"] = None
+                self.tochilka_button.setText("Запустить Токарку")
+                self.tochilka_button.setStyleSheet("font-size: 16px; padding: 10px;")
+                print("Точилка остановлена.")
+            except Exception as e:
+                print("Ошибка при остановке Точилки:", e)
 
     def kill_all_bots(self):
         for key in self.processes:
