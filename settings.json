@@ -1,8 +1,8 @@
 {
-    "automood_key": "l",
-    "autorun_key": "[",
-    "autoeat_key": "o",
-    "password": "Mordor2013",
-    "character": "Second",
-    "spawn": "Lasttochka"
+    "automood_key": "P",
+    "autorun_key": "b",
+    "autoeat_key": "h",
+    "rage_mp_path": "C:\\Users\\user\\Desktop\\RAGE Multiplayer.lnk",
+    "telegram_token": "7578634723:AAGlmCDBA_Gt47UEgJxZjdWEDC_ZaOp6R_0",
+    "telegram_chat_id": "1082926031"
 }

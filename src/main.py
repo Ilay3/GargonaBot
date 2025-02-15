@@ -6,8 +6,17 @@ import datetime
 import uuid
 import platform
 import hashlib
-import requests  # Для связи с сервером
+import requests
 import json
+
+##########################
+# NEW: Импорт для Flask и Telegram
+##########################
+import threading
+from flask import Flask, request
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, CallbackContext, CallbackQueryHandler, MessageHandler, Filters
+##########################
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
@@ -38,7 +47,6 @@ def get_keyboard_layout():
     return layout_id & 0xFFFF
 
 LANG_ENGLISH = 0x0409
-
 
 # Функции для работы с настройками
 def load_settings():
@@ -85,16 +93,13 @@ AUTOMOOD_PATH    = os.path.join(MODULES_BASE, "OtherService", "automood.py")
 AUTOEAT_PATH     = os.path.join(MODULES_BASE, "OtherService", "autoeat.py")
 # Добавляем новый путь для скрипта спортзала (качалки)
 KACHALKA_PATH    = os.path.join(MODULES_BASE, "OtherService", "kachalka.py")
-KOSYAKI_PATH = os.path.join(MODULES_BASE, "CraftService", "kosyaki.py")
+KOSYAKI_PATH     = os.path.join(MODULES_BASE, "CraftService", "kosyaki.py")
 
 TAXI_PATH = os.path.join(MODULES_BASE, "WorkService", "Taxi.py")
 FIREMAN_PATH = os.path.join(MODULES_BASE, "WorkService", "fireman.py")
 
 SHVEIKA_PATH = os.path.join(MODULES_BASE, "MiniGamesService", "Shveika.py")
 SKOLZKAYA_PATH = os.path.join(MODULES_BASE, "MiniGamesService", "Skolzkaya.py")
-
-
-
 
 # Используем sys.executable для запуска того же интерпретатора.
 PYTHON_EXEC = sys.executable
@@ -177,6 +182,8 @@ def save_license(key, expiry_date):
     except Exception as e:
         print(f"❌ Ошибка при сохранении лицензии: {e}")
 
+flask_app = Flask("LocalControl")
+
 ########################################################################
 # Основное окно приложения
 ########################################################################
@@ -204,8 +211,11 @@ class MainWindow(QMainWindow):
             "taxi": None,
             "fireman": None,
             "shveika": None,
-            "skolzkaya": None
+            "skolzkaya": None,
+            "telegram_bot": None
+
         }
+
         self.inactive_counter = 0
         self.bots_killed_due_to_inactivity = False
 
@@ -241,6 +251,7 @@ class MainWindow(QMainWindow):
         self.menu_list.addItem("Спортзал")
         self.menu_list.addItem("Контракты")
         self.menu_list.addItem("Настройки")
+        self.menu_list.addItem("Телеграмм")
 
         self.menu_list.currentRowChanged.connect(self.switch_page)
         left_layout.addWidget(self.menu_list)
@@ -262,6 +273,7 @@ class MainWindow(QMainWindow):
         self.page_sportzal = self.create_sportzal_page()
         self.page_contracts = self.create_contracts_page()
         self.page_settings = self.create_settings_page()
+        self.tg_page = self.create_tg_page()
 
 
         self.pages.addWidget(self.page_antiafk)
@@ -271,6 +283,7 @@ class MainWindow(QMainWindow):
         self.pages.addWidget(self.page_sportzal)
         self.pages.addWidget(self.page_contracts)
         self.pages.addWidget(self.page_settings)
+        self.pages.addWidget(self.tg_page)
         main_layout.addWidget(self.pages, 3)
         self.switch_page(0)
 
@@ -635,6 +648,70 @@ class MainWindow(QMainWindow):
 
         layout.addStretch()
         return widget
+
+    def create_tg_page(self):
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+
+        title = QLabel("Telegram")
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("font-size: 20px;")
+        layout.addWidget(title)
+
+        desc = QLabel(
+            "Введите токен вашего Telegram бота и Chat ID, затем сохраните настройки. При запуске приложения, если настройки заданы, бот автоматически отправит сообщение об успешной авторизации.")
+        desc.setAlignment(Qt.AlignCenter)
+        desc.setWordWrap(True)
+        desc.setStyleSheet("font-size: 16px;")
+        layout.addWidget(desc)
+
+        token_label = QLabel("Telegram Bot Token:")
+        token_label.setAlignment(Qt.AlignCenter)
+        token_label.setStyleSheet("font-size: 16px;")
+        layout.addWidget(token_label)
+
+        self.telegram_token_input = QLineEdit()
+        self.telegram_token_input.setPlaceholderText("Введите токен")
+        self.telegram_token_input.setStyleSheet("font-size: 16px; padding: 5px;")
+        layout.addWidget(self.telegram_token_input)
+
+        chat_id_label = QLabel("Telegram Chat ID:")
+        chat_id_label.setAlignment(Qt.AlignCenter)
+        chat_id_label.setStyleSheet("font-size: 16px;")
+        layout.addWidget(chat_id_label)
+
+        self.telegram_chat_id_input = QLineEdit()
+        self.telegram_chat_id_input.setPlaceholderText("Введите Chat ID")
+        self.telegram_chat_id_input.setStyleSheet("font-size: 16px; padding: 5px;")
+        layout.addWidget(self.telegram_chat_id_input)
+
+        # Загружаем сохранённые настройки и заполняем поля
+        settings = load_settings()
+        self.telegram_token_input.setText(settings.get("telegram_token", ""))
+        self.telegram_chat_id_input.setText(settings.get("telegram_chat_id", ""))
+
+        # Только кнопка сохранения настроек (без кнопки запуска)
+        self.tg_save_button = QPushButton("Сохранить настройки")
+        self.tg_save_button.setStyleSheet("font-size: 16px; padding: 10px;")
+        self.tg_save_button.clicked.connect(self.save_tg_settings)
+        layout.addWidget(self.tg_save_button)
+
+        layout.addStretch()
+        return widget
+
+    def save_tg_settings(self):
+        token = self.telegram_token_input.text().strip()
+        chat_id = self.telegram_chat_id_input.text().strip()
+        if token and chat_id:
+            settings = load_settings()
+            settings["telegram_token"] = token
+            settings["telegram_chat_id"] = chat_id
+            save_settings(settings)
+            QMessageBox.information(self, "Настройки сохранены",
+                                    f"Telegram настройки сохранены:\nToken: {token}\nChat ID: {chat_id}")
+        else:
+            QMessageBox.critical(self, "Ошибка", "Введите корректные значения для токена и Chat ID")
+
 
     def save_passive_settings(self):
         """Сохраняет настройки для функций Automood, Autorun и Autoeat."""
@@ -1085,30 +1162,27 @@ class MainWindow(QMainWindow):
             settings = load_settings()
             settings["rage_mp_path"] = rage_mp_path
             save_settings(settings)
-            # Можно показать сообщение, например, через work_hint_label или QMessageBox
             self.work_hint_label.setText(f"Настройки сохранены: Rage MP = {rage_mp_path}")
         else:
             self.work_hint_label.setText("Ошибка: введите корректный путь до Rage MP")
 
     def toggle_launch_game(self):
-        # Получаем путь до ярлыка Rage MP, введённый пользователем
         shortcut_path = self.rage_mp_path_input.text().strip()
         if not shortcut_path:
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, "Ошибка", "Пожалуйста, введите путь до ярлыка Rage MP!")
             return
-        # Проверяем, что файл существует и имеет правильное расширение
         if not os.path.exists(shortcut_path) or not shortcut_path.lower().endswith(".lnk"):
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, "Ошибка", "Неверный путь или расширение файла! Укажите ярлык (.lnk).")
             return
         try:
-            # Запускаем ярлык с правами администратора
             os.startfile(shortcut_path, "runas")
             print("Игра запущена через ярлык.")
         except Exception as e:
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, "Ошибка запуска", f"Не удалось запустить игру: {e}")
+
 
     def kill_all_bots(self):
         for key in self.processes:
@@ -1139,14 +1213,169 @@ class MainWindow(QMainWindow):
             self.chk_autorun.setChecked(False)
         self.work_hint_label.setText("")
 
+##################### NEW: Flask endpoints, using the window object #####################
+@flask_app.route("/toggle_antiafk", methods=["GET"])
+def route_toggle_antiafk():
+    global window
+    # Допустим, antiafk считается «запущенным», если window.processes["antiafk"] не None
+    was_running = (window.processes["antiafk"] is not None)
+    window.toggle_antiafk()  # это «переключает» состояние
+    is_running = (window.processes["antiafk"] is not None)
+
+    if not was_running and is_running:
+        return "запущено", 200
+    elif was_running and not is_running:
+        return "остановлено", 200
+    else:
+        return "toggled!", 200
+
+
+@flask_app.route("/toggle_koleso", methods=["GET"])
+def route_toggle_koleso():
+    global window
+    was_running = (window.processes["koleso"] is not None)
+    if was_running:
+        # Останавливаем
+        try:
+            window.processes["koleso"].terminate()
+            window.processes["koleso"].wait()
+            window.processes["koleso"] = None
+            return "остановлено", 200
+        except:
+            return "ошибка при остановке", 200
+    else:
+        # Запускаем
+        wd = os.path.dirname(KRUTKAKOLES_PATH)
+        try:
+            proc = subprocess.Popen([PYTHON_EXEC, KRUTKAKOLES_PATH], cwd=wd)
+            window.processes["koleso"] = proc
+            return "запущено", 200
+        except:
+            return "ошибка при запуске", 200
+
+@flask_app.route("/toggle_lottery", methods=["GET"])
+def route_toggle_lottery():
+    global window
+    was_running = (window.processes["lottery"] is not None)
+    if was_running:
+        # Останавливаем
+        try:
+            window.processes["lottery"].terminate()
+            window.processes["lottery"].wait()
+            window.processes["lottery"] = None
+            return "остановлено", 200
+        except:
+            return "ошибка при остановке", 200
+    else:
+        # Запускаем
+        wd = os.path.dirname(LOTTERY_PATH)
+        try:
+            proc = subprocess.Popen([PYTHON_EXEC, LOTTERY_PATH], cwd=wd)
+            window.processes["lottery"] = proc
+            return "запущено", 200
+        except:
+            return "ошибка при запуске", 200
+
+
+@flask_app.route("/toggle_reconnect", methods=["GET"])
+def route_toggle_reconnect():
+    global window
+
+    # Проверим, запущен ли уже reconnect
+    if window.processes.get("reconnect") is not None:
+        # Останавливаем
+        proc = window.processes["reconnect"]
+        try:
+            proc.terminate()  # Грубое завершение
+            proc.wait()
+            window.processes["reconnect"] = None
+            return "остановлено", 200
+        except:
+            return "ошибка при остановке", 200
+    else:
+
+        try:
+            script_path = os.path.join(MODULES_BASE, "OtherService", "reconect.py")
+
+            # или где у вас лежит reconnect.py
+            settings_path = os.path.join(PROJECT_ROOT, "settings.json")
+
+            proc = subprocess.Popen(
+                [PYTHON_EXEC, script_path, settings_path],
+                cwd=os.path.dirname(script_path)
+            )
+            window.processes["reconnect"] = proc
+            return "запущено", 200
+        except Exception as e:
+            print("Ошибка запуска reconnect:", e)
+            return "ошибка при запуске", 200
+
+##################### NEW: Функции запуска Flask и Telegram-бота ########################
+def run_flask_server():
+    flask_app.run(host="127.0.0.1", port=5001, debug=False, use_reloader=False)
+
+def run_telegram_bot():
+    s = load_settings()
+    token = s.get("telegram_token", "")
+    if not token:
+        print(">>> Нет 'telegram_token' в settings.json, не запускаем бота.")
+        return
+
+    updater = Updater(token, use_context=True)
+    dp = updater.dispatcher
+
+    def cmd_start(update: Update, context: CallbackContext):
+        keyboard = [
+            [KeyboardButton("Anti-AFK"), KeyboardButton("Крутка колеса"), KeyboardButton("Лотерея")],
+            [KeyboardButton("Реконнект")]  # <-- новая кнопка
+        ]
+        reply_markup = ReplyKeyboardMarkup(
+            keyboard,
+            resize_keyboard=True,
+            one_time_keyboard=False
+        )
+        update.message.reply_text(
+            "Привет! Выберите действие:",
+            reply_markup=reply_markup
+        )
+
+    dp.add_handler(CommandHandler("start", cmd_start))
+
+    def msg_handler(update: Update, context: CallbackContext):
+        text = update.message.text
+
+        if text == "Anti-AFK":
+            requests.get("http://127.0.0.1:5001/toggle_antiafk")
+
+        elif text == "Крутка колеса":
+            requests.get("http://127.0.0.1:5001/toggle_koleso")
+
+        elif text == "Лотерея":
+            requests.get("http://127.0.0.1:5001/toggle_lottery")
+
+        elif text == "Реконнект":
+            try:
+                r = requests.get("http://127.0.0.1:5001/toggle_reconnect")
+                update.message.reply_text(f"Реконнект: {r.text}")
+            except Exception as e:
+                update.message.reply_text(f"Ошибка: {e}")
+
+        else:
+            update.message.reply_text("Не понял команду. Нажмите /start.")
+
+    dp.add_handler(MessageHandler(Filters.text, msg_handler))
+
+    updater.start_polling()
+
+#############################
+# Основная точка входа
+#############################
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     license_valid = False
 
-    # 1️⃣ Загружаем сохранённую лицензию
     expiry_date = load_license()
 
-    # 2️⃣ Проверяем подписку
     if expiry_date:
         now = datetime.datetime.now()
         if expiry_date > now:
@@ -1157,7 +1386,7 @@ if __name__ == "__main__":
     else:
         print("❌ Ключ не найден. Требуется активация!")
 
-    # 3️⃣ Если подписка недействительна, запрашиваем ключ у пользователя
+    # 3️⃣ Если подписка недействительна, запрашиваем ключ
     if not license_valid:
         license_dialog = QDialog()
         license_dialog.setWindowTitle("Аутентификация")
@@ -1203,4 +1432,14 @@ if __name__ == "__main__":
     window.setWindowTitle("Менеджер сервисов бота")
     window.setGeometry(100, 100, 900, 600)
     window.show()
+
+    ################# NEW: Запуск Flask и Telegram-бота в отдельных потоках #################
+    flask_thread = threading.Thread(target=run_flask_server, daemon=True)
+    flask_thread.start()
+    print(">>> Flask-сервер запущен на 127.0.0.1:5001")
+
+    tg_thread = threading.Thread(target=run_telegram_bot, daemon=True)
+    tg_thread.start()
+    print(">>> Telegram-бот запущен (команды /start, /antiafk)")
+
     sys.exit(app.exec())
