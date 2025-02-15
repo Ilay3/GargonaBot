@@ -18,8 +18,7 @@ logging.info("Запуск скрипта koleso.")
 templates = {
     "DostupKoleso": cv2.imread('../../../resources/images/ImgKoleso/DostupKoleso.png', 0),
     "IconCasino": cv2.imread('../../../resources/images/ImgKoleso/IconCasino.png', 0),
-    "InterfaceKolesa": cv2.imread('../../../resources/images/ImgKoleso/InterfaceKolesa.png', 0),
-    "ButtonKoloso": cv2.imread('../../../resources/images/ImgKoleso/ButtonKoloso.png', 0)
+    "InterfaceKolesa": cv2.imread('../../../resources/images/ImgKoleso/InterfaceKolesa.png', 0)
 }
 logging.info("Эталонные изображения загружены.")
 
@@ -66,8 +65,8 @@ while True:
         logging.debug("DostupKoleso не найден, продолжаем поиск...")
         print("Первая картинка не найдена, продолжаем поиск...")
 
-# 2-4. Последовательный поиск и клик по IconCasino, InterfaceKolesa, ButtonKoloso
-for step in ["IconCasino", "InterfaceKolesa", "ButtonKoloso"]:
+# 2-3. Последовательный поиск и клик по IconCasino, InterfaceKolesa
+for step in ["IconCasino", "InterfaceKolesa"]:
     while True:
         time.sleep(1)
         pos = find_template_on_screen(templates[step])
@@ -83,23 +82,12 @@ for step in ["IconCasino", "InterfaceKolesa", "ButtonKoloso"]:
             logging.debug(f"{step} не найден, продолжаем поиск...")
             print(f"{step}.png не найден, продолжаем поиск...")
 
-# 5. Ожидание 20 секунд, клик по последнему шаблону и финальный скриншот
-time.sleep(5)  # Небольшая задержка перед кликом по последнему элементу
-pos_last = find_template_on_screen(templates["ButtonKoloso"])
-
-if pos_last:
-    x, y = pos_last
-    pyautogui.moveTo(x, y, duration=0.2)  # Двигаем мышь к центру ButtonKoloso
-    pyautogui.click(x, y)  # Клик по центру ButtonKoloso
-    logging.info(f"Клик по ButtonKoloso в координатах: {x}, {y}")
-    print(f"Клик по ButtonKoloso в координатах: {x}, {y}")
-
-# Ждем 20 секунд перед финальным скриншотом
+# 4. Ожидание 20 секунд, финальный скриншот
 time.sleep(20)
 
 # Делаем финальный скриншот
 timestamp = get_timestamp()
-screenshot_path = f"../../../screenshots/{timestamp}_final_screenshot.png"
+screenshot_path = f"../../resources/screenshots/{timestamp}_final_screenshot.png"
 pyautogui.screenshot(screenshot_path)
 logging.info(f"Финальный скриншот сохранён по пути: {screenshot_path}")
 
