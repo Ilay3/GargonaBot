@@ -14,6 +14,7 @@ templates = {
     "Iconlottery": cv2.imread('../../../resources/images/ImgLottery/Iconlottery.png', 0),
     "Buttonlottery": cv2.imread('../../../resources/images/ImgLottery/Buttonlottery.png', 0),
     "Backspacetriggerlottery": cv2.imread('../../../resources/images/ImgLottery/Backspacetriggerlottery.png', 0),
+    "Backspacetriggerlottery2": cv2.imread('../../../resources/images/ImgLottery/Backspacetriggerlottery2.png', 0),  # Добавлено второе изображение
 }
 
 
@@ -89,11 +90,14 @@ def run_process():
 
     while True:
         time.sleep(0.05)
-        backspace_pos = find_template_on_screen(templates["Backspacetriggerlottery"])
-        if backspace_pos:
+        # Поиск любого из двух шаблонов для нажатия backspace
+        backspace_pos1 = find_template_on_screen(templates["Backspacetriggerlottery"])
+        backspace_pos2 = find_template_on_screen(templates["Backspacetriggerlottery2"])
+
+        if backspace_pos1 or backspace_pos2:
             pyautogui.press('backspace')
             pyautogui.press('backspace')
-            print("Обнаружено второе изображение! Дважды нажат Backspace.")
+            print("Обнаружено изображение для Backspace! Дважды нажат Backspace.")
             time.sleep(7200)  # Ожидание 2 часа перед следующей проверкой
             break
         else:
