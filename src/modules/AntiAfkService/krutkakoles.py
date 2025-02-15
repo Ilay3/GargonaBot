@@ -18,7 +18,8 @@ logging.info("Запуск скрипта koleso.")
 templates = {
     "DostupKoleso": cv2.imread('../../../resources/images/ImgKoleso/DostupKoleso.png', 0),
     "IconCasino": cv2.imread('../../../resources/images/ImgKoleso/IconCasino.png', 0),
-    "InterfaceKolesa": cv2.imread('../../../resources/images/ImgKoleso/InterfaceKolesa.png', 0)
+    "InterfaceKolesa": cv2.imread('../../../resources/images/ImgKoleso/InterfaceKolesa.png', 0),
+    "ButtonKoloso": cv2.imread('../../../resources/images/ImgKoleso/ButtonKoloso.png', 0)
 }
 logging.info("Эталонные изображения загружены.")
 
@@ -47,56 +48,63 @@ def find_template_on_screen(template, threshold=0.9):
     logging.debug("Шаблон не найден.")
     return None
 
-
-# 1. Поиск первой картинки (DostupKoleso)
 while True:
-    time.sleep(1)
-    pos1 = find_template_on_screen(templates["DostupKoleso"])
-
-    if pos1:
-        logging.info("Найден DostupKoleso.")
-
-        # Нажимаем стрелку вверх
-        pyautogui.press('up')
-        logging.info("Нажата стрелка вверх")
-        print("Нажата стрелка вверх")
-        break
-    else:
-        logging.debug("DostupKoleso не найден, продолжаем поиск...")
-        print("Первая картинка не найдена, продолжаем поиск...")
-
-# 2-3. Последовательный поиск и клик по IconCasino, InterfaceKolesa
-for step in ["IconCasino", "InterfaceKolesa"]:
+    # 1. Поиск первой картинки (DostupKoleso)
     while True:
         time.sleep(1)
-        pos = find_template_on_screen(templates[step])
+        pos1 = find_template_on_screen(templates["DostupKoleso"])
 
-        if pos:
-            x, y = pos
-            pyautogui.moveTo(x, y, duration=0.2)  # Двигаем мышь к найденной области
-            pyautogui.click(x, y)  # Кликаем по найденной области
-            logging.info(f"Клик по {step} в координатах: {x}, {y}")
-            print(f"Клик по {step}.png в координатах: {x}, {y}")
+        if pos1:
+            logging.info("Найден DostupKoleso.")
+            time.sleep(60)
+
+            # Нажимаем стрелку вверх
+            pyautogui.press('up')
+            logging.info("Нажата стрелка вверх")
+            print("Нажата стрелка вверх")
             break
         else:
-            logging.debug(f"{step} не найден, продолжаем поиск...")
-            print(f"{step}.png не найден, продолжаем поиск...")
+            logging.debug("DostupKoleso не найден, продолжаем поиск...")
+            print("Первая картинка не найдена, продолжаем поиск...")
 
-# 4. Ожидание 20 секунд, финальный скриншот
-time.sleep(20)
+    # 2-3. Последовательный поиск и клик по IconCasino, InterfaceKolesa
+    for step in ["IconCasino", "InterfaceKolesa"]:
+        while True:
+            time.sleep(1)
+            pos = find_template_on_screen(templates[step])
 
-# Делаем финальный скриншот
-timestamp = get_timestamp()
-screenshot_path = f"../../resources/screenshots/{timestamp}_final_screenshot.png"
-pyautogui.screenshot(screenshot_path)
-logging.info(f"Финальный скриншот сохранён по пути: {screenshot_path}")
+            if pos:
+                x, y = pos
+                pyautogui.moveTo(x, y, duration=0.2)  # Двигаем мышь к найденной области
+                pyautogui.click(x, y)  # Кликаем по найденной области
+                logging.info(f"Клик по {step} в координатах: {x}, {y}")
+                print(f"Клик по {step}.png в координатах: {x}, {y}")
+                break
+            else:
+                logging.debug(f"{step} не найден, продолжаем поиск...")
+                print(f"{step}.png не найден, продолжаем поиск...")
 
-# Нажимаем дважды ESC и BACKSPACE
-pyautogui.press('esc')
-logging.info("Нажата клавиша ESC.")
-time.sleep(0.5)
-pyautogui.press('esc')
-logging.info("Нажата клавиша ESC ещё раз.")
-time.sleep(0.5)
-pyautogui.press('backspace')
-logging.info("Нажата клавиша BACKSPACE.")
+    # 4. Поиск и клик по ButtonKoloso
+    while True:
+        time.sleep(4)  # Задержка 4 секунды перед каждой попыткой поиска
+        pos_button = find_template_on_screen(templates["ButtonKoloso"])
+
+        if pos_button:
+            x, y = pos_button
+            pyautogui.moveTo(x, y, duration=0.2)  # Двигаем мышь к центру ButtonKoloso
+            pyautogui.click(x, y)  # Клик по ButtonKoloso
+            logging.info(f"Клик по ButtonKoloso в координатах: {x}, {y}")
+            print(f"Клик по ButtonKoloso в координатах: {x}, {y}")
+            break
+        else:
+            logging.debug("ButtonKoloso не найден, продолжаем поиск...")
+            print("ButtonKoloso не найден, продолжаем поиск...")
+
+    # 5. Пауза 10 секунд
+    time.sleep(10)
+
+    # 6. Делаем скриншот
+    timestamp = get_timestamp()
+    screenshot_path = f"../../resources/screenshots/{timestamp}_final_screenshot.png"
+    pyautogui.screenshot(screenshot_path)
+    logging.info(f"Финальный скриншот сохранён по пути: {screenshot_path}")
