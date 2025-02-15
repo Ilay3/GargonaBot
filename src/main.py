@@ -1,8 +1,6 @@
 import sys
 import requests
 from telegram.ext import Updater, CommandHandler
-
-# Подключаем ParseMode для стилизации HTML
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ParseMode
 
 import ctypes
@@ -68,6 +66,7 @@ else:
 sys.path.append(os.path.join(MODULES_BASE, "ProcessChecker"))
 import process_checker
 
+# Пути к скриптам
 ANTIAFK_PATH     = os.path.join(MODULES_BASE, "AntiAfkService", "antiafk.py")
 KRUTKAKOLES_PATH = os.path.join(MODULES_BASE, "AntiAfkService", "krutkakoles.py")
 LOTTERY_PATH     = os.path.join(MODULES_BASE, "AntiAfkService", "lottery.py")
@@ -87,9 +86,8 @@ SHVEIKA_PATH     = os.path.join(MODULES_BASE, "MiniGamesService", "Shveika.py")
 SKOLZKAYA_PATH   = os.path.join(MODULES_BASE, "MiniGamesService", "Skolzkaya.py")
 SCHEMS_PATH      = os.path.join(MODULES_BASE, "MiniGamesService", "Schems.py")
 RECONNECT_PATH   = os.path.join(MODULES_BASE, "OtherService", "reconect.py")
-DEMORGAN_PATH = os.path.join(MODULES_BASE, "TuragaService", "ShveiaDemorgan.py")
-TOCHILKA_PATH = os.path.join(MODULES_BASE, "TuragaService", "Tochilka.py")
-
+DEMORGAN_PATH    = os.path.join(MODULES_BASE, "TuragaService", "ShveiaDemorgan.py")
+TOCHILKA_PATH    = os.path.join(MODULES_BASE, "TuragaService", "Tochilka.py")
 
 PYTHON_EXEC = sys.executable
 
@@ -157,6 +155,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Менеджер сервисов бота")
         self.setGeometry(100, 100, 900, 600)
+        # Обновлённый словарь процессов
         self.processes = {
             "antiafk": None,
             "koleso": None,
@@ -199,6 +198,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
 
+        # Создаем левое меню
         left_panel = QWidget()
         left_panel.setSizePolicy(left_panel.sizePolicy().horizontalPolicy(), QSizePolicy.Expanding)
         left_layout = QVBoxLayout(left_panel)
@@ -207,16 +207,17 @@ class MainWindow(QMainWindow):
             "font-size: 18px;"
             "QListWidget::item:selected { background-color: #ff7043; border: 4px solid #ff7043; }"
         )
+        # Обновленный порядок пунктов меню
+        self.menu_list.addItem("Начало")
         self.menu_list.addItem("Anti-AFK")
-        self.menu_list.addItem("Крафты")
         self.menu_list.addItem("Работы")
+        self.menu_list.addItem("Крафты")
         self.menu_list.addItem("Пассивные функции")
-        self.menu_list.addItem("Спортзал")
         self.menu_list.addItem("Контракты")
-        self.menu_list.addItem("Настройки")
+        self.menu_list.addItem("Спортзал")
         self.menu_list.addItem("Деморган")
+        self.menu_list.addItem("Настройки")
         self.menu_list.addItem("Телеграмм")
-
         self.menu_list.currentRowChanged.connect(self.switch_page)
         left_layout.addWidget(self.menu_list)
 
@@ -227,26 +228,30 @@ class MainWindow(QMainWindow):
 
         main_layout.addWidget(left_panel, 1)
 
+        # Создаем страницы
         self.pages = QStackedWidget()
+        self.page_home = self.create_home_page()
         self.page_antiafk = self.create_antiafk_page()
-        self.page_cook = self.create_cook_page()
         self.page_work = self.create_work_page()
+        self.page_cook = self.create_cook_page()
         self.page_automood = self.create_automood_page()
-        self.page_sportzal = self.create_sportzal_page()
         self.page_contracts = self.create_contracts_page()
-        self.page_settings = self.create_settings_page()
+        self.page_sportzal = self.create_sportzal_page()
         self.page_demorgan = self.create_demorgan_page()
+        self.page_settings = self.create_settings_page()
         self.tg_page = self.create_tg_page()
 
-        self.pages.addWidget(self.page_antiafk)
-        self.pages.addWidget(self.page_cook)
-        self.pages.addWidget(self.page_work)
-        self.pages.addWidget(self.page_automood)
-        self.pages.addWidget(self.page_sportzal)
-        self.pages.addWidget(self.page_contracts)
-        self.pages.addWidget(self.page_settings)
-        self.pages.addWidget(self.page_demorgan)
-        self.pages.addWidget(self.tg_page)
+        # Добавляем страницы в нужном порядке
+        self.pages.addWidget(self.page_home)       # 0: Начало
+        self.pages.addWidget(self.page_antiafk)      # 1: Anti-AFK
+        self.pages.addWidget(self.page_work)         # 2: Работы
+        self.pages.addWidget(self.page_cook)         # 3: Крафты
+        self.pages.addWidget(self.page_automood)     # 4: Пассивные функции
+        self.pages.addWidget(self.page_contracts)    # 5: Контракты
+        self.pages.addWidget(self.page_sportzal)       # 6: Спортзал
+        self.pages.addWidget(self.page_demorgan)       # 7: Деморган
+        self.pages.addWidget(self.page_settings)       # 8: Настройки
+        self.pages.addWidget(self.tg_page)             # 9: Телеграмм
 
         main_layout.addWidget(self.pages, 3)
         self.switch_page(0)
@@ -259,37 +264,19 @@ class MainWindow(QMainWindow):
         self.license_timer.timeout.connect(self.update_license_label)
         self.license_timer.start(1000)
 
-    def check_keyboard_layout(self):
-        if get_keyboard_layout() != LANG_ENGLISH:
-            QMessageBox.warning(
-                self, "Внимание!",
-                "Пожалуйста, переключите раскладку клавиатуры на английскую, наш бот работает только с ней!"
-            )
-
-    def periodic_license_check(self):
-        if self.license_expiry:
-            now = datetime.datetime.now()
-            if now >= self.license_expiry:
-                print("❌ Лицензия истекла. Завершение работы приложения.")
-                error_dialog = QDialog(self)
-                error_dialog.setWindowTitle("Ошибка лицензии")
-                dlg_layout = QVBoxLayout(error_dialog)
-                msg_label = QLabel("Срок действия лицензии истек. Приложение будет закрыто.")
-                msg_label.setAlignment(Qt.AlignCenter)
-                dlg_layout.addWidget(msg_label)
-                error_dialog.exec()
-                QApplication.quit()
-
-    def update_license_label(self):
-        if self.license_expiry:
-            now = datetime.datetime.now()
-            remaining = self.license_expiry - now
-            if remaining.total_seconds() <= 0:
-                self.license_label.setText("Подписка истекла")
-            else:
-                self.license_label.setText("Подписка до: " + self.license_expiry.strftime("%Y-%m-%d %H:%M"))
-        else:
-            self.license_label.setText("Лицензия не активирована")
+    def create_home_page(self):
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        title = QLabel("Добро пожаловать!")
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("font-size: 24px; font-weight: bold;")
+        layout.addWidget(title)
+        description = QLabel("Это менеджер сервисов бота.\nВыберите нужную функцию в меню слева.")
+        description.setAlignment(Qt.AlignCenter)
+        description.setStyleSheet("font-size: 18px;")
+        layout.addWidget(description)
+        layout.addStretch()
+        return widget
 
     def switch_page(self, index):
         self.pages.setCurrentIndex(index)
@@ -322,19 +309,62 @@ class MainWindow(QMainWindow):
             QCheckBox { font-size: 16px; }
         """)
         self.chk_lottery.toggled.connect(self.toggle_lottery)
-
+        layout.addWidget(self.chk_lottery)
         self.chk_myservice = QCheckBox("Reconnect")
         self.chk_myservice.setStyleSheet("""
-                QCheckBox::indicator { width: 15px; height: 15px; }
-                QCheckBox::indicator:unchecked { background-color: #bdbdbd; border: 2px solid #757575; border-radius: 7px; }
-                QCheckBox::indicator:checked { background-color: #ff7043; border: 2px solid #ffa726; border-radius: 7px; }
-                QCheckBox { font-size: 16px; }
-            """)
-        # Здесь исправлено: передаём функцию без вызова
+            QCheckBox::indicator { width: 15px; height: 15px; }
+            QCheckBox::indicator:unchecked { background-color: #bdbdbd; border: 2px solid #757575; border-radius: 7px; }
+            QCheckBox::indicator:checked { background-color: #ff7043; border: 2px solid #ffa726; border-radius: 7px; }
+            QCheckBox { font-size: 16px; }
+        """)
         self.chk_myservice.toggled.connect(self.toggle_reconnect)
         layout.addWidget(self.chk_myservice)
+        layout.addStretch()
+        return widget
 
-        layout.addWidget(self.chk_lottery)
+    def create_work_page(self):
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        title = QLabel("Работы")
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("font-size: 20px;")
+        layout.addWidget(title)
+        self.waxta_button = QPushButton("Запустить работу на Шахте")
+        self.waxta_button.setStyleSheet("font-size: 16px; padding: 10px;")
+        self.waxta_button.clicked.connect(self.toggle_waxta)
+        layout.addWidget(self.waxta_button)
+        self.port_button = QPushButton("Запустить работу в Порту")
+        self.port_button.setStyleSheet("font-size: 16px; padding: 10px;")
+        self.port_button.clicked.connect(self.toggle_port)
+        layout.addWidget(self.port_button)
+        self.stroyka_button = QPushButton("Запустить работу на Стройке")
+        self.stroyka_button.setStyleSheet("font-size: 16px; padding: 10px;")
+        self.stroyka_button.clicked.connect(self.toggle_stroyka)
+        layout.addWidget(self.stroyka_button)
+        self.kozlodoy_button = QPushButton("Запустить работу на Ферме")
+        self.kozlodoy_button.setStyleSheet("font-size: 16px; padding: 10px;")
+        self.kozlodoy_button.clicked.connect(self.toggle_kozlodoy)
+        layout.addWidget(self.kozlodoy_button)
+        self.taxi_button = QPushButton("Запустить работу в Такси")
+        self.taxi_button.setStyleSheet("font-size: 16px; padding: 10px;")
+        self.taxi_button.clicked.connect(self.toggle_taxi)
+        layout.addWidget(self.taxi_button)
+        self.fireman_button = QPushButton("Запустить работу Пожарным")
+        self.fireman_button.setStyleSheet("font-size: 16px; padding: 10px;")
+        self.fireman_button.clicked.connect(self.toggle_fireman)
+        layout.addWidget(self.fireman_button)
+        self.chk_autorun = QCheckBox("Авто-Бег")
+        self.chk_autorun.setStyleSheet("""
+            QCheckBox::indicator { width: 15px; height: 15px; }
+            QCheckBox::indicator:unchecked { background-color: #bdbdbd; border: 2px solid #757575; border-radius: 7px; }
+            QCheckBox::indicator:checked { background-color: #ff7043; border: 2px solid #ffa726; border-radius: 7px; }
+            QCheckBox { font-size: 16px; }
+        """)
+        self.chk_autorun.toggled.connect(self.toggle_autorun)
+        layout.addWidget(self.chk_autorun)
+        self.work_hint_label = QLabel("")
+        self.work_hint_label.setStyleSheet("font-size: 16px; color: #ff7043;")
+        layout.addWidget(self.work_hint_label)
         layout.addStretch()
         return widget
 
@@ -349,7 +379,6 @@ class MainWindow(QMainWindow):
         cook_header.setAlignment(Qt.AlignCenter)
         cook_header.setStyleSheet("font-size: 20px; margin-top: 20px;")
         layout.addWidget(cook_header)
-
         cook_desc = QLabel("Запустите скрипт для выполнения специальной операции по созданию блюд.")
         cook_desc.setAlignment(Qt.AlignCenter)
         cook_desc.setWordWrap(True)
@@ -371,18 +400,15 @@ class MainWindow(QMainWindow):
         self.cook_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.cook_button.clicked.connect(self.toggle_cook)
         layout.addWidget(self.cook_button)
-
         kosyaki_header = QLabel("Создание Косяков")
         kosyaki_header.setAlignment(Qt.AlignCenter)
         kosyaki_header.setStyleSheet("font-size: 20px; margin-top: 20px;")
         layout.addWidget(kosyaki_header)
-
         kosyaki_desc = QLabel("Запустите скрипт для выполнения специальной операции по обработке косяков.")
         kosyaki_desc.setAlignment(Qt.AlignCenter)
         kosyaki_desc.setWordWrap(True)
         kosyaki_desc.setStyleSheet("font-size: 16px; color: #555555;")
         layout.addWidget(kosyaki_desc)
-
         self.kosyaki_button = QPushButton("Запустить Косюки")
         self.kosyaki_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.kosyaki_button.clicked.connect(self.toggle_kosyaki)
@@ -390,97 +416,13 @@ class MainWindow(QMainWindow):
         layout.addStretch()
         return widget
 
-    def create_work_page(self):
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        title = QLabel("Work Service")
-        title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("font-size: 20px;")
-        layout.addWidget(title)
-        self.waxta_button = QPushButton("Запустить работу на Шахте")
-        self.waxta_button.setStyleSheet("font-size: 16px; padding: 10px;")
-        self.waxta_button.clicked.connect(self.toggle_waxta)
-        layout.addWidget(self.waxta_button)
-        self.port_button = QPushButton("Запустить работу в Порту")
-        self.port_button.setStyleSheet("font-size: 16px; padding: 10px;")
-        self.port_button.clicked.connect(self.toggle_port)
-        layout.addWidget(self.port_button)
-        self.stroyka_button = QPushButton("Запустить работу на Стройке")
-        self.stroyka_button.setStyleSheet("font-size: 16px; padding: 10px;")
-        self.stroyka_button.clicked.connect(self.toggle_stroyka)
-        layout.addWidget(self.stroyka_button)
-        self.kozlodoy_button = QPushButton("Запустить работу на Ферме")
-        self.kozlodoy_button.setStyleSheet("font-size: 16px; padding: 10px;")
-        self.kozlodoy_button.clicked.connect(self.toggle_kozlodoy)
-        layout.addWidget(self.kozlodoy_button)
-
-        self.taxi_button = QPushButton("Запустить работу в Такси")
-        self.taxi_button.setStyleSheet("font-size: 16px; padding: 10px;")
-        self.taxi_button.clicked.connect(self.toggle_taxi)
-        layout.addWidget(self.taxi_button)
-
-        self.fireman_button = QPushButton("Запустить работу Пожарным")
-        self.fireman_button.setStyleSheet("font-size: 16px; padding: 10px;")
-        self.fireman_button.clicked.connect(self.toggle_fireman)
-        layout.addWidget(self.fireman_button)
-
-        self.chk_autorun = QCheckBox("Авто-Бег")
-        self.chk_autorun.setStyleSheet("""
-            QCheckBox::indicator { width: 15px; height: 15px; }
-            QCheckBox::indicator:unchecked { background-color: #bdbdbd; border: 2px solid #757575; border-radius: 7px; }
-            QCheckBox::indicator:checked { background-color: #ff7043; border: 2px solid #ffa726; border-radius: 7px; }
-            QCheckBox { font-size: 16px; }
-        """)
-        self.chk_autorun.toggled.connect(self.toggle_autorun)
-        layout.addWidget(self.chk_autorun)
-        self.work_hint_label = QLabel("")
-        self.work_hint_label.setStyleSheet("font-size: 16px; color: #ff7043;")
-        layout.addWidget(self.work_hint_label)
-        layout.addStretch()
-        return widget
-
-    def create_contracts_page(self):
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-
-        title = QLabel("Контракты")
-        title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("font-size: 20px;")
-        layout.addWidget(title)
-
-        desc = QLabel("Запустите скрипты для выполнения контрактов.")
-        desc.setAlignment(Qt.AlignCenter)
-        desc.setWordWrap(True)
-        desc.setStyleSheet("font-size: 16px;")
-        layout.addWidget(desc)
-
-        self.shveika_button = QPushButton("Запустить Швейную фабрику")
-        self.shveika_button.setStyleSheet("font-size: 16px; padding: 10px;")
-        self.shveika_button.clicked.connect(self.toggle_shveika)
-        layout.addWidget(self.shveika_button)
-
-        self.skolzkaya_button = QPushButton("Запустить Скользкая дорога")
-        self.skolzkaya_button.setStyleSheet("font-size: 16px; padding: 10px;")
-        self.skolzkaya_button.clicked.connect(self.toggle_skolzkaya)
-        layout.addWidget(self.skolzkaya_button)
-
-        self.schems_button = QPushButton("Запустить Схемы")
-        self.schems_button.setStyleSheet("font-size: 16px; padding: 10px;")
-        self.schems_button.clicked.connect(self.toggle_schems)
-        layout.addWidget(self.schems_button)
-
-        layout.addStretch()
-        return widget
-
     def create_automood_page(self):
         widget = QWidget()
         layout = QVBoxLayout(widget)
-
         title = QLabel("Пассивные функции")
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet("font-size: 20px;")
         layout.addWidget(title)
-
         automood_instr = QLabel("Настройте функцию Авто-Настроение.")
         automood_instr.setAlignment(Qt.AlignCenter)
         layout.addWidget(automood_instr)
@@ -491,12 +433,10 @@ class MainWindow(QMainWindow):
         self.automood_key_input.setPlaceholderText("Введите клавишу, например: L")
         self.automood_key_input.setStyleSheet("font-size: 16px; padding: 5px;")
         layout.addWidget(self.automood_key_input)
-
         self.automood_launch_button = QPushButton("Запустить Авто-Настроение")
         self.automood_launch_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.automood_launch_button.clicked.connect(self.toggle_automood)
         layout.addWidget(self.automood_launch_button)
-
         autorun_instr = QLabel("Настройте функцию Авто-Бег (эмуляция нажатия выбранной клавиши).")
         autorun_instr.setAlignment(Qt.AlignCenter)
         layout.addWidget(autorun_instr)
@@ -507,12 +447,10 @@ class MainWindow(QMainWindow):
         self.autorun_key_input.setPlaceholderText("Введите клавишу, например: J")
         self.autorun_key_input.setStyleSheet("font-size: 16px; padding: 5px;")
         layout.addWidget(self.autorun_key_input)
-
         self.autorun_launch_button = QPushButton("Запустить Авто-Бег")
         self.autorun_launch_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.autorun_launch_button.clicked.connect(self.toggle_autorun)
         layout.addWidget(self.autorun_launch_button)
-
         autoeat_instr = QLabel("Настройте функцию Авто-Еда (эмуляция нажатия клавиши при недостатке еды).")
         autoeat_instr.setAlignment(Qt.AlignCenter)
         layout.addWidget(autoeat_instr)
@@ -523,24 +461,46 @@ class MainWindow(QMainWindow):
         self.autoeat_key_input.setPlaceholderText("Введите клавишу, например: H")
         self.autoeat_key_input.setStyleSheet("font-size: 16px; padding: 5px;")
         layout.addWidget(self.autoeat_key_input)
-
         self.autoeat_launch_button = QPushButton("Запустить Авто-Еда")
         self.autoeat_launch_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.autoeat_launch_button.clicked.connect(self.toggle_autoeat)
         layout.addWidget(self.autoeat_launch_button)
-
         settings = load_settings()
         self.automood_key_input.setText(settings.get("automood_key", "l"))
         self.autorun_key_input.setText(settings.get("autorun_key", "+"))
         self.autoeat_key_input.setText(settings.get("autoeat_key", "o"))
-
         layout.addStretch()
-
         self.passive_save_button = QPushButton("Сохранить настройки")
         self.passive_save_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.passive_save_button.clicked.connect(self.save_passive_settings)
         layout.addWidget(self.passive_save_button)
+        return widget
 
+    def create_contracts_page(self):
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        title = QLabel("Контракты")
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("font-size: 20px;")
+        layout.addWidget(title)
+        desc = QLabel("Запустите скрипты для выполнения контрактов.")
+        desc.setAlignment(Qt.AlignCenter)
+        desc.setWordWrap(True)
+        desc.setStyleSheet("font-size: 16px;")
+        layout.addWidget(desc)
+        self.shveika_button = QPushButton("Запустить Швейную фабрику")
+        self.shveika_button.setStyleSheet("font-size: 16px; padding: 10px;")
+        self.shveika_button.clicked.connect(self.toggle_shveika)
+        layout.addWidget(self.shveika_button)
+        self.skolzkaya_button = QPushButton("Запустить Скользкая дорога")
+        self.skolzkaya_button.setStyleSheet("font-size: 16px; padding: 10px;")
+        self.skolzkaya_button.clicked.connect(self.toggle_skolzkaya)
+        layout.addWidget(self.skolzkaya_button)
+        self.schems_button = QPushButton("Запустить Схемы")
+        self.schems_button.setStyleSheet("font-size: 16px; padding: 10px;")
+        self.schems_button.clicked.connect(self.toggle_schems)
+        layout.addWidget(self.schems_button)
+        layout.addStretch()
         return widget
 
     def create_sportzal_page(self):
@@ -555,190 +515,154 @@ class MainWindow(QMainWindow):
         desc.setWordWrap(True)
         desc.setStyleSheet("font-size: 16px;")
         layout.addWidget(desc)
-
         self.kachalka_launch_button = QPushButton("Запустить тренировку в спортзале")
         self.kachalka_launch_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.kachalka_launch_button.clicked.connect(self.toggle_kachalka)
         layout.addWidget(self.kachalka_launch_button)
-
         layout.addStretch()
         return widget
 
     def create_settings_page(self):
         widget = QWidget()
         layout = QVBoxLayout(widget)
-
         title = QLabel("Настройки")
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet("font-size: 20px;")
         layout.addWidget(title)
-
         # Поле для ввода пароля
         password_label = QLabel("Пароль:")
         password_label.setAlignment(Qt.AlignCenter)
         password_label.setStyleSheet("font-size: 16px;")
         layout.addWidget(password_label)
-
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("Введите пароль")
         self.password_input.setEchoMode(QLineEdit.Password)
         self.password_input.setStyleSheet("font-size: 16px; padding: 5px;")
         layout.addWidget(self.password_input)
-
-        # Комбобокс для выбора персонажа (отображаем русские слова)
+        # Комбобокс для выбора персонажа (русские слова)
         character_label = QLabel("Персонаж:")
         character_label.setAlignment(Qt.AlignCenter)
         character_label.setStyleSheet("font-size: 16px;")
         layout.addWidget(character_label)
-
         self.character_combo = QComboBox()
         self.character_combo.setStyleSheet("font-size: 16px; padding: 5px;")
-        # Заполняем комбобокс отображаемыми значениями
         character_display = {"First": "Первый", "Second": "Второй", "Third": "Третий"}
         for key, value in character_display.items():
-            self.character_combo.addItem(value, key)  # value для показа, key – данные
+            self.character_combo.addItem(value, key)
         layout.addWidget(self.character_combo)
-
         # Комбобокс для выбора точки спауна (русские слова)
         spawn_label = QLabel("Точка спауна:")
         spawn_label.setAlignment(Qt.AlignCenter)
         spawn_label.setStyleSheet("font-size: 16px;")
         layout.addWidget(spawn_label)
-
         self.spawn_combo = QComboBox()
         self.spawn_combo.setStyleSheet("font-size: 16px; padding: 5px;")
         spawn_display = {"Dom": "Дом", "Kvartira": "Квартира", "Spawn": "Спавн", "Lasttochka": "Последняя точка"}
         for key, value in spawn_display.items():
             self.spawn_combo.addItem(value, key)
         layout.addWidget(self.spawn_combo)
-
-        # Например, поле для Rage MP остается как было
+        # Поле для ввода пути до Rage MP (ярлыка)
         path_label = QLabel("Путь до Rage MP:")
         path_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(path_label)
-
         self.rage_mp_path_input = QLineEdit()
-        self.rage_mp_path_input.setPlaceholderText("Например: C:\\Program Files\\RageMP\\RageMP.exe")
+        self.rage_mp_path_input.setPlaceholderText("Например: C:\\Users\\user\\Desktop\\RAGE Multiplayer.lnk")
         self.rage_mp_path_input.setStyleSheet("font-size: 16px; padding: 5px;")
         layout.addWidget(self.rage_mp_path_input)
-
         # Загрузка существующих настроек
         settings = load_settings()
         self.password_input.setText(settings.get("password", ""))
-        # Для комбобоксов используем метод, возвращающий данные (второй аргумент)
         current_char = settings.get("character", "First")
         index = self.character_combo.findData(current_char)
         if index >= 0:
             self.character_combo.setCurrentIndex(index)
-
         current_spawn = settings.get("spawn", "Dom")
         index = self.spawn_combo.findData(current_spawn)
         if index >= 0:
             self.spawn_combo.setCurrentIndex(index)
-
         self.rage_mp_path_input.setText(settings.get("rage_mp_path", ""))
-
         self.settings_save_button = QPushButton("Сохранить настройки")
         self.settings_save_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.settings_save_button.clicked.connect(self.save_settings_page)
         layout.addWidget(self.settings_save_button)
-
+        self.launch_game_button = QPushButton("Запустить игру")
+        self.launch_game_button.setStyleSheet("font-size: 16px; padding: 10px;")
+        self.launch_game_button.clicked.connect(self.toggle_launch_game)
+        layout.addWidget(self.launch_game_button)
         layout.addStretch()
         return widget
 
     def create_tg_page(self):
         widget = QWidget()
         layout = QVBoxLayout(widget)
-
         title = QLabel("Telegram")
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet("font-size: 20px;")
         layout.addWidget(title)
-
         desc = QLabel("Введите токен вашего Telegram бота и Chat ID, затем сохраните настройки.")
         desc.setAlignment(Qt.AlignCenter)
         desc.setWordWrap(True)
         desc.setStyleSheet("font-size: 16px;")
         layout.addWidget(desc)
-
         token_label = QLabel("Telegram Bot Token:")
         token_label.setAlignment(Qt.AlignCenter)
         token_label.setStyleSheet("font-size: 16px;")
         layout.addWidget(token_label)
-
         self.telegram_token_input = QLineEdit()
         self.telegram_token_input.setPlaceholderText("Введите токен")
         self.telegram_token_input.setStyleSheet("font-size: 16px; padding: 5px;")
         layout.addWidget(self.telegram_token_input)
-
         chat_id_label = QLabel("Telegram Chat ID:")
         chat_id_label.setAlignment(Qt.AlignCenter)
         chat_id_label.setStyleSheet("font-size: 16px;")
         layout.addWidget(chat_id_label)
-
         self.telegram_chat_id_input = QLineEdit()
         self.telegram_chat_id_input.setPlaceholderText("Введите Chat ID")
         self.telegram_chat_id_input.setStyleSheet("font-size: 16px; padding: 5px;")
         layout.addWidget(self.telegram_chat_id_input)
-
         settings = load_settings()
         self.telegram_token_input.setText(settings.get("telegram_token", ""))
         self.telegram_chat_id_input.setText(settings.get("telegram_chat_id", ""))
-
         self.tg_save_button = QPushButton("Сохранить настройки")
         self.tg_save_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.tg_save_button.clicked.connect(self.save_tg_settings)
         layout.addWidget(self.tg_save_button)
-
         layout.addStretch()
         return widget
 
     def create_demorgan_page(self):
         widget = QWidget()
         layout = QVBoxLayout(widget)
-
-        # ----- Блок Demorgan -----
+        # Блок Demorgan
         title = QLabel("Пошив Формы")
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet("font-size: 20px;")
         layout.addWidget(title)
-
-        desc = QLabel(
-            "Скрипт для автоматизации процесса в деморгане."
-        )
+        desc = QLabel("Скрипт для автоматизации процесса в деморгане.")
         desc.setAlignment(Qt.AlignCenter)
         desc.setWordWrap(True)
         desc.setStyleSheet("font-size: 16px; color: #555555;")
         layout.addWidget(desc)
-
         self.demorgan_button = QPushButton("Запустить Пошив Формы")
         self.demorgan_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.demorgan_button.clicked.connect(self.toggle_demorgan)
         layout.addWidget(self.demorgan_button)
-
-        # ----- Блок Tochilka -----
-        # Можно добавить небольшой разделитель (необязательно)
+        # Блок Tochilka
         sep_label = QLabel(" ")
         layout.addWidget(sep_label)
-
         tochilka_title = QLabel("Токарка")
         tochilka_title.setAlignment(Qt.AlignCenter)
         tochilka_title.setStyleSheet("font-size: 20px; margin-top: 20px;")
         layout.addWidget(tochilka_title)
-
-        tochilka_desc = QLabel(
-            "Скрипт для заточки предметов (пример описания)."
-        )
+        tochilka_desc = QLabel("Скрипт для заточки предметов (пример описания).")
         tochilka_desc.setAlignment(Qt.AlignCenter)
         tochilka_desc.setWordWrap(True)
         tochilka_desc.setStyleSheet("font-size: 16px; color: #555555;")
         layout.addWidget(tochilka_desc)
-
         self.tochilka_button = QPushButton("Запустить Точилку")
         self.tochilka_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.tochilka_button.clicked.connect(self.toggle_tochilka)
         layout.addWidget(self.tochilka_button)
-
         layout.addStretch()
         return widget
 
@@ -778,9 +702,7 @@ class MainWindow(QMainWindow):
                 proc = subprocess.Popen([PYTHON_EXEC, KOSYAKI_PATH], cwd=wd)
                 self.processes["kosyaki"] = proc
                 self.kosyaki_button.setText("Остановить создание Косяков")
-                self.kosyaki_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
-                )
+                self.kosyaki_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
                 print("Скрипт kosyaki запущен, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске kosyaki:", e)
@@ -802,9 +724,7 @@ class MainWindow(QMainWindow):
                 proc = subprocess.Popen([PYTHON_EXEC, AUTOMOOD_PATH], cwd=wd)
                 self.processes["automood"] = proc
                 self.automood_launch_button.setText("Остановить Авто-Настроение")
-                self.automood_launch_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
-                )
+                self.automood_launch_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
                 print("Automood запущен, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Automood:", e)
@@ -826,9 +746,7 @@ class MainWindow(QMainWindow):
                 proc = subprocess.Popen([PYTHON_EXEC, AUTORUN_PATH], cwd=wd)
                 self.processes["autorun"] = proc
                 self.autorun_launch_button.setText("Остановить Авто-Бег")
-                self.autorun_launch_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
-                )
+                self.autorun_launch_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
                 self.chk_autorun.setChecked(True)
                 print("Autorun запущен, PID:", proc.pid)
             except Exception as e:
@@ -852,9 +770,7 @@ class MainWindow(QMainWindow):
                 proc = subprocess.Popen([PYTHON_EXEC, AUTOEAT_PATH], cwd=wd)
                 self.processes["autoeat"] = proc
                 self.autoeat_launch_button.setText("Остановить Авто-Еда")
-                self.autoeat_launch_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
-                )
+                self.autoeat_launch_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
                 print("Autoeat запущен, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Autoeat:", e)
@@ -919,7 +835,6 @@ class MainWindow(QMainWindow):
                     print("Ошибка при остановке Лотереи:", e)
                 self.processes["lottery"] = None
 
-
     def toggle_cook(self):
         if self.processes["cook"] is None:
             try:
@@ -945,9 +860,7 @@ class MainWindow(QMainWindow):
                 proc = subprocess.Popen([PYTHON_EXEC, WAXTA_PATH], cwd=wd)
                 self.processes["waxta"] = proc
                 self.waxta_button.setText("Остановить работу на Шахте")
-                self.waxta_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
-                )
+                self.waxta_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
                 print("Waxta запущена, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Шахты:", e)
@@ -969,9 +882,7 @@ class MainWindow(QMainWindow):
                 proc = subprocess.Popen([PYTHON_EXEC, PORT_PATH], cwd=wd)
                 self.processes["port"] = proc
                 self.port_button.setText("Остановить работу в Порту")
-                self.port_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
-                )
+                self.port_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
                 print("Port запущена, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Port:", e)
@@ -993,9 +904,7 @@ class MainWindow(QMainWindow):
                 proc = subprocess.Popen([PYTHON_EXEC, STROYKA_PATH], cwd=wd)
                 self.processes["stroyka"] = proc
                 self.stroyka_button.setText("Остановить работу на Стройке")
-                self.stroyka_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
-                )
+                self.stroyka_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
                 print("Стройка запущена, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Стройки:", e)
@@ -1017,9 +926,7 @@ class MainWindow(QMainWindow):
                 proc = subprocess.Popen([PYTHON_EXEC, KOZLODOY_PATH], cwd=wd)
                 self.processes["kozlodoy"] = proc
                 self.kozlodoy_button.setText("Остановить работу на Ферме")
-                self.kozlodoy_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
-                )
+                self.kozlodoy_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
                 print("Работа на Ферме запущена, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске работы на Ферме:", e)
@@ -1041,9 +948,7 @@ class MainWindow(QMainWindow):
                 proc = subprocess.Popen([PYTHON_EXEC, TAXI_PATH], cwd=wd)
                 self.processes["taxi"] = proc
                 self.taxi_button.setText("Остановить работу Таксистом")
-                self.taxi_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
-                )
+                self.taxi_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
                 print("Taxi запущен, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Taxi:", e)
@@ -1065,9 +970,7 @@ class MainWindow(QMainWindow):
                 proc = subprocess.Popen([PYTHON_EXEC, FIREMAN_PATH], cwd=wd)
                 self.processes["fireman"] = proc
                 self.fireman_button.setText("Остановить работу Пожарным")
-                self.fireman_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
-                )
+                self.fireman_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
                 print("Fireman запущен, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Fireman:", e)
@@ -1089,9 +992,7 @@ class MainWindow(QMainWindow):
                 proc = subprocess.Popen([PYTHON_EXEC, KACHALKA_PATH], cwd=wd)
                 self.processes["kachalka"] = proc
                 self.kachalka_launch_button.setText("Остановить Спортзал")
-                self.kachalka_launch_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
-                )
+                self.kachalka_launch_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
                 print("Спортзал запущен (kachalka), PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Спортзала (kachalka):", e)
@@ -1113,9 +1014,7 @@ class MainWindow(QMainWindow):
                 proc = subprocess.Popen([PYTHON_EXEC, SHVEIKA_PATH], cwd=wd)
                 self.processes["shveika"] = proc
                 self.shveika_button.setText("Остановить пошив Одежды")
-                self.shveika_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
-                )
+                self.shveika_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
                 print("Shveika запущен, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Shveika:", e)
@@ -1137,9 +1036,7 @@ class MainWindow(QMainWindow):
                 proc = subprocess.Popen([PYTHON_EXEC, SKOLZKAYA_PATH], cwd=wd)
                 self.processes["skolzkaya"] = proc
                 self.skolzkaya_button.setText("Остановить Скользкая дорога")
-                self.skolzkaya_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
-                )
+                self.skolzkaya_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
                 print("Skolzkaya запущен, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Skolzkaya:", e)
@@ -1161,9 +1058,7 @@ class MainWindow(QMainWindow):
                 proc = subprocess.Popen([PYTHON_EXEC, SCHEMS_PATH], cwd=wd)
                 self.processes["schems"] = proc
                 self.schems_button.setText("Остановить Схемы")
-                self.schems_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
-                )
+                self.schems_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
                 print("schems запущен, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске schems:", e)
@@ -1215,15 +1110,19 @@ class MainWindow(QMainWindow):
         if rage_mp_path:
             settings = load_settings()
             settings["password"] = self.password_input.text().strip()
-            settings["character"] = self.character_combo.currentText()
-            settings["spawn"] = self.spawn_combo.currentText()
-            settings["rage_mp_path"] = self.rage_mp_path_input.text().strip()
+            settings["character"] = self.character_combo.currentData()
+            settings["spawn"] = self.spawn_combo.currentData()
+            settings["rage_mp_path"] = rage_mp_path
             save_settings(settings)
             self.work_hint_label.setText(f"Настройки сохранены: Rage MP = {rage_mp_path}")
         else:
             self.work_hint_label.setText("Ошибка: введите корректный путь до Rage MP")
 
     def toggle_launch_game(self):
+        # Проверка активности игры с помощью process_checker
+        if process_checker.is_game_active():
+            QMessageBox.information(self, "Информация", "Игра уже запущена!")
+            return
         shortcut_path = self.rage_mp_path_input.text().strip()
         if not shortcut_path:
             QMessageBox.critical(self, "Ошибка", "Пожалуйста, введите путь до ярлыка Rage MP!")
@@ -1239,20 +1138,16 @@ class MainWindow(QMainWindow):
 
     def toggle_demorgan(self):
         if self.processes["demorgan"] is None:
-            # Запускаем
             wd = os.path.dirname(DEMORGAN_PATH)
             try:
                 proc = subprocess.Popen([PYTHON_EXEC, DEMORGAN_PATH], cwd=wd)
                 self.processes["demorgan"] = proc
                 self.demorgan_button.setText("Остановить Пошив формы")
-                self.demorgan_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
-                )
+                self.demorgan_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
                 print("Пошив формы запущен, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Пошив формы:", e)
         else:
-            # Останавливаем
             try:
                 self.processes["demorgan"].terminate()
                 self.processes["demorgan"].wait()
@@ -1270,9 +1165,7 @@ class MainWindow(QMainWindow):
                 proc = subprocess.Popen([PYTHON_EXEC, TOCHILKA_PATH], cwd=wd)
                 self.processes["tochilka"] = proc
                 self.tochilka_button.setText("Остановить Токарку")
-                self.tochilka_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
-                )
+                self.tochilka_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
                 print("Точилка запущена, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Точилки:", e)
@@ -1286,6 +1179,39 @@ class MainWindow(QMainWindow):
                 print("Точилка остановлена.")
             except Exception as e:
                 print("Ошибка при остановке Точилки:", e)
+
+    def periodic_license_check(self):
+        if self.license_expiry:
+            now = datetime.datetime.now()
+            if now >= self.license_expiry:
+                print("❌ Лицензия истекла. Завершение работы приложения.")
+                error_dialog = QDialog(self)
+                error_dialog.setWindowTitle("Ошибка лицензии")
+                dlg_layout = QVBoxLayout(error_dialog)
+                msg_label = QLabel("Срок действия лицензии истек. Приложение будет закрыто.")
+                msg_label.setAlignment(Qt.AlignCenter)
+                dlg_layout.addWidget(msg_label)
+                error_dialog.exec()
+                QApplication.quit()
+
+    def update_license_label(self):
+        if self.license_expiry:
+            now = datetime.datetime.now()
+            remaining = self.license_expiry - now
+            if remaining.total_seconds() <= 0:
+                self.license_label.setText("Подписка истекла")
+            else:
+                self.license_label.setText("Подписка до: " + self.license_expiry.strftime("%Y-%m-%d %H:%M"))
+        else:
+            self.license_label.setText("Лицензия не активирована")
+
+    def check_keyboard_layout(self):
+        if get_keyboard_layout() != LANG_ENGLISH:
+            QMessageBox.warning(
+                self,
+                "Внимание!",
+                "Пожалуйста, переключите раскладку клавиатуры на английскую, наш бот работает только с ней!"
+            )
 
     def kill_all_bots(self):
         for key in self.processes:
@@ -1322,18 +1248,14 @@ def run_telegram_bot():
     if not token:
         print(">>> Нет 'telegram_token' в settings.json, бот не запустится.")
         return
-
     updater = Updater(token, use_context=True)
     dp = updater.dispatcher
-
     def cmd_start(update: Update, context: CallbackContext):
-        # Красивая кнопочная клавиатура с эмодзи
         keyboard = [
-            [KeyboardButton("🎯 Anti-AFK"), KeyboardButton("🎡 Крутка колеса"), KeyboardButton("🎟 Лотерея")],
+            [KeyboardButton("🎯 Anti-AFK"), KeyboardButton("🎡 Авто-колесо"), KeyboardButton("🎟 Лотерея")],
             [KeyboardButton("♻️ Реконнект")],
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
-
         text = (
             "<b>Привет!</b> Я бот управления сервисами.\n"
             "Выберите действие, нажав кнопку внизу.\n\n"
@@ -1344,69 +1266,42 @@ def run_telegram_bot():
             "• Реконнект — перезапустить игру при вылете\n"
         )
         update.message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
-
     dp.add_handler(CommandHandler("start", cmd_start))
-
     def msg_handler(update: Update, context: CallbackContext):
         global window
         text = update.message.text
-
         if text == "🎯 Anti-AFK":
             window.toggle_antiafk()
             status = "запущен" if window.processes["antiafk"] else "остановлен"
-            update.message.reply_text(
-                f"<b>Anti-AFK</b>: {status}",
-                parse_mode=ParseMode.HTML
-            )
-
+            update.message.reply_text(f"<b>Anti-AFK</b>: {status}", parse_mode=ParseMode.HTML)
         elif text == "🎡 Авто-колесо":
             if window.processes["koleso"] is None:
                 window.toggle_koleso(True)
-                update.message.reply_text(
-                    "🎡 <b>Авто-колесо</b> запущена.",
-                    parse_mode=ParseMode.HTML
-                )
+                update.message.reply_text("🎡 <b>Авто-колесо</b> запущена.", parse_mode=ParseMode.HTML)
             else:
                 window.toggle_koleso(False)
-                update.message.reply_text(
-                    "🎡 <b>Авто-колесо</b> остановлена.",
-                    parse_mode=ParseMode.HTML
-                )
-
+                update.message.reply_text("🎡 <b>Авто-колесо</b> остановлена.", parse_mode=ParseMode.HTML)
         elif text == "🎟 Лотерея":
             if window.processes["lottery"] is None:
                 window.toggle_lottery(True)
-                update.message.reply_text(
-                    "🎟 <b>Лотерея</b> запущена.",
-                    parse_mode=ParseMode.HTML
-                )
+                update.message.reply_text("🎟 <b>Лотерея</b> запущена.", parse_mode=ParseMode.HTML)
             else:
                 window.toggle_lottery(False)
-                update.message.reply_text(
-                    "🎟 <b>Лотерея</b> остановлена.",
-                    parse_mode=ParseMode.HTML
-                )
-
+                update.message.reply_text("🎟 <b>Лотерея</b> остановлена.", parse_mode=ParseMode.HTML)
         elif text == "♻️ Реконнект":
-            window.toggle_reconnect()
+            window.toggle_reconnect(not window.processes.get("reconnect") is None)
             if window.processes["reconnect"] is None:
                 update.message.reply_text("♻️ <b>Реконнект</b> остановлен.", parse_mode=ParseMode.HTML)
             else:
                 update.message.reply_text("♻️ <b>Реконнект</b> запущен.", parse_mode=ParseMode.HTML)
-
         else:
-            update.message.reply_text(
-                "Неизвестная команда. Нажмите /start, чтобы открыть меню.",
-                parse_mode=ParseMode.HTML
-            )
-
+            update.message.reply_text("Неизвестная команда. Нажмите /start, чтобы открыть меню.", parse_mode=ParseMode.HTML)
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, msg_handler))
     updater.start_polling()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     license_valid = False
-
     expiry_date = load_license()
     if expiry_date:
         now = datetime.datetime.now()
@@ -1417,7 +1312,6 @@ if __name__ == "__main__":
             print("❌ Подписка истекла. Требуется новый ключ!")
     else:
         print("❌ Ключ не найден. Требуется активация!")
-
     if not license_valid:
         license_dialog = QDialog()
         license_dialog.setWindowTitle("Аутентификация")
@@ -1435,7 +1329,6 @@ if __name__ == "__main__":
         message_label.setAlignment(Qt.AlignCenter)
         message_label.setStyleSheet("color: #ff7043; font-size: 16px;")
         layout.addWidget(message_label)
-
         def on_activate():
             key = key_input.text().strip()
             success, expiry = validate_key(key)
@@ -1445,25 +1338,20 @@ if __name__ == "__main__":
                 license_dialog.accept()
             else:
                 message_label.setText("❌ Ошибка активации. Проверьте ключ.")
-
         activate_button.clicked.connect(on_activate)
         if license_dialog.exec() != QDialog.Accepted:
             print("❌ Активация не завершена. Выход...")
             sys.exit(1)
         license_valid = True
-
     if not license_valid:
         print("❌ Подписка недействительна. Запуск невозможен.")
         sys.exit(1)
-
     print("🚀 Запуск основного приложения...")
     window = MainWindow()
     window.setWindowTitle("Менеджер сервисов бота")
     window.setGeometry(100, 100, 900, 600)
     window.show()
-
     tg_thread = threading.Thread(target=run_telegram_bot, daemon=True)
     tg_thread.start()
     print(">>> Telegram-бот запущен (используйте /start)")
-
     sys.exit(app.exec())
