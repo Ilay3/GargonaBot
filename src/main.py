@@ -9,6 +9,14 @@ import hashlib
 import requests  # Для связи с сервером
 import json
 
+##########################
+# NEW: Импорт для Flask и Telegram
+##########################
+import threading
+from flask import Flask, request
+from telegram.ext import Updater, CommandHandler
+##########################
+
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -38,7 +46,6 @@ def get_keyboard_layout():
     return layout_id & 0xFFFF
 
 LANG_ENGLISH = 0x0409
-
 
 # Функции для работы с настройками
 def load_settings():
@@ -85,16 +92,13 @@ AUTOMOOD_PATH    = os.path.join(MODULES_BASE, "OtherService", "automood.py")
 AUTOEAT_PATH     = os.path.join(MODULES_BASE, "OtherService", "autoeat.py")
 # Добавляем новый путь для скрипта спортзала (качалки)
 KACHALKA_PATH    = os.path.join(MODULES_BASE, "OtherService", "kachalka.py")
-KOSYAKI_PATH = os.path.join(MODULES_BASE, "CraftService", "kosyaki.py")
+KOSYAKI_PATH     = os.path.join(MODULES_BASE, "CraftService", "kosyaki.py")
 
 TAXI_PATH = os.path.join(MODULES_BASE, "WorkService", "Taxi.py")
 FIREMAN_PATH = os.path.join(MODULES_BASE, "WorkService", "fireman.py")
 
 SHVEIKA_PATH = os.path.join(MODULES_BASE, "MiniGamesService", "Shveika.py")
 SKOLZKAYA_PATH = os.path.join(MODULES_BASE, "MiniGamesService", "Skolzkaya.py")
-
-
-
 
 # Используем sys.executable для запуска того же интерпретатора.
 PYTHON_EXEC = sys.executable
@@ -176,6 +180,8 @@ def save_license(key, expiry_date):
         print(f"💾 Лицензия сохранена: подписка до {expiry_date}")
     except Exception as e:
         print(f"❌ Ошибка при сохранении лицензии: {e}")
+
+flask_app = Flask("LocalControl")
 
 ########################################################################
 # Основное окно приложения
@@ -1237,6 +1243,58 @@ class MainWindow(QMainWindow):
             self.chk_autorun.setChecked(False)
         self.work_hint_label.setText("")
 
+
+
+##################### NEW: Flask endpoints, using the window object #####################
+@flask_app.route("/toggle_antiafk", methods=["GET"])
+def route_toggle_antiafk():
+    # Когда приходит GET /toggle_antiafk, вызываем тот же метод, что при нажатии кнопки
+    window.toggle_antiafk()
+    return "AntiAFK toggled!", 200
+
+##################### NEW: Функции запуска Flask и Telegram-бота ########################
+def run_flask_server():
+    flask_app.run(host="127.0.0.1", port=5001, debug=False, use_reloader=False)
+
+def run_telegram_bot():
+    """Запускаем Telegram-бота, который слушает /start и /antiafk."""
+    s = load_settings()
+    token = s.get("telegram_token", "")
+    if not token:
+        print(">>> Нет 'telegram_token' в settings.json, не запускаем бота.")
+        return
+
+    updater = Updater(token, use_context=True)
+    dp = updater.dispatcher
+
+    def cmd_start(update, context):
+        update.message.reply_text(
+            "Привет! Это Telegram-бот для управления GargonaBot.\n"
+            "Доступные команды:\n"
+            "/antiafk – Запустить/остановить antiafk"
+        )
+
+    def cmd_antiafk(update, context):
+        try:
+            # Шлём запрос на локальный Flask-сервер
+            r = requests.get("http://127.0.0.1:5001/toggle_antiafk")
+            if r.status_code == 200:
+                update.message.reply_text("OK: " + r.text)
+            else:
+                update.message.reply_text(f"Ошибка: {r.status_code} {r.text}")
+        except Exception as e:
+            update.message.reply_text(f"Исключение при запросе: {e}")
+
+    dp.add_handler(CommandHandler("start", cmd_start))
+    dp.add_handler(CommandHandler("antiafk", cmd_antiafk))
+
+    print(">>> Telegram-бот запущен. Ожидаем команды...")
+    updater.start_polling()
+
+
+#############################
+# Основная точка входа
+#############################
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     license_valid = False
@@ -1255,7 +1313,7 @@ if __name__ == "__main__":
     else:
         print("❌ Ключ не найден. Требуется активация!")
 
-    # 3️⃣ Если подписка недействительна, запрашиваем ключ у пользователя
+    # 3️⃣ Если подписка недействительна, запрашиваем ключ
     if not license_valid:
         license_dialog = QDialog()
         license_dialog.setWindowTitle("Аутентификация")
@@ -1301,4 +1359,14 @@ if __name__ == "__main__":
     window.setWindowTitle("Менеджер сервисов бота")
     window.setGeometry(100, 100, 900, 600)
     window.show()
+
+    ################# NEW: Запуск Flask и Telegram-бота в отдельных потоках #################
+    flask_thread = threading.Thread(target=run_flask_server, daemon=True)
+    flask_thread.start()
+    print(">>> Flask-сервер запущен на 127.0.0.1:5001")
+
+    tg_thread = threading.Thread(target=run_telegram_bot, daemon=True)
+    tg_thread.start()
+    print(">>> Telegram-бот запущен (команды /start, /antiafk)")
+
     sys.exit(app.exec())
