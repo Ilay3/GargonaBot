@@ -1207,11 +1207,12 @@ class MainWindow(QMainWindow):
 
     def check_keyboard_layout(self):
         if get_keyboard_layout() != LANG_ENGLISH:
-            QMessageBox.warning(
-                self,
-                "Внимание!",
-                "Пожалуйста, переключите раскладку клавиатуры на английскую, наш бот работает только с ней!"
-            )
+            msgBox = QMessageBox(self)
+            msgBox.setWindowFlags(msgBox.windowFlags() | Qt.WindowStaysOnTopHint)
+            msgBox.setIcon(QMessageBox.Warning)
+            msgBox.setWindowTitle("Внимание!")
+            msgBox.setText("Пожалуйста, переключите раскладку клавиатуры на английскую, наш бот работает только с ней!")
+            msgBox.exec()
 
     def kill_all_bots(self):
         for key in self.processes:
