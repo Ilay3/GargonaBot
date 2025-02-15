@@ -14,18 +14,16 @@ templates = {
     "Iconlottery": cv2.imread('../../../resources/images/ImgLottery/Iconlottery.png', 0),
     "Buttonlottery": cv2.imread('../../../resources/images/ImgLottery/Buttonlottery.png', 0),
     "Backspacetriggerlottery": cv2.imread('../../../resources/images/ImgLottery/Backspacetriggerlottery.png', 0),
+    "Backspacetriggerlottery2": cv2.imread('../../../resources/images/ImgLottery/Backspacetriggerlottery2.png', 0),  # Добавлено второе изображение
 }
-
 
 def get_moscow_time():
     """Возвращает текущее московское время."""
     return datetime.now(moscow_tz)
 
-
 def get_timestamp():
     """Возвращает текущую дату и время в формате YYYY-MM-DD_HH-MM-SS"""
     return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-
 
 def find_template_on_screen(template, threshold=0.9):
     """Ищет шаблон на экране, возвращает координаты центра найденного объекта."""
@@ -51,7 +49,6 @@ def find_template_on_screen(template, threshold=0.9):
             print(f"Координаты ({center_x}, {center_y}) за пределами экрана!")
             return None
     return None
-
 
 def run_process():
     """Основной процесс поиска и нажатий."""
@@ -89,23 +86,32 @@ def run_process():
 
     while True:
         time.sleep(0.05)
-        backspace_pos = find_template_on_screen(templates["Backspacetriggerlottery"])
-        if backspace_pos:
+        # Поиск любого из двух шаблонов для нажатия backspace
+        backspace_pos1 = find_template_on_screen(templates["Backspacetriggerlottery"])
+        backspace_pos2 = find_template_on_screen(templates["Backspacetriggerlottery2"])
+
+        if backspace_pos1 or backspace_pos2:
             pyautogui.press('backspace')
             pyautogui.press('backspace')
-            print("Обнаружено второе изображение! Дважды нажат Backspace.")
+            print("Обнаружено изображение для Backspace! Дважды нажат Backspace.")
             time.sleep(7200)  # Ожидание 2 часа перед следующей проверкой
+            print("Процесс приостановлен на 2 часа.")
             break
         else:
             print("Изображение для Backspace не найдено, продолжаем поиск...")
 
+# Флаг для отслеживания последнего выполнения
+last_process_time = None
 
 # Запуск кода с 12:01 до 23:59 по МСК
 while True:
     now = get_moscow_time()
-    if 12 <= now.hour < 24:
+
+    # Если время в пределах с 12:01 до 23:59 по МСК, и прошло 2 часа с последнего выполнения
+    if 12 <= now.hour < 24 and (last_process_time is None or (now - last_process_time) > timedelta(hours=2)):
         print(f"Запуск процесса в {now.strftime('%H:%M:%S')} по МСК")
         run_process()
+        last_process_time = now  # Обновляем время последнего выполнения
     else:
         print(f"Ожидание... Сейчас {now.strftime('%H:%M:%S')} по МСК")
         time.sleep(30)

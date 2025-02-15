@@ -23,11 +23,13 @@ templates = {
 }
 logging.info("Эталонные изображения загружены.")
 
+
 def get_timestamp():
     """Возвращает текущую дату и время в формате YYYY-MM-DD_HH-MM-SS"""
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     logging.debug(f"Получен временной штамп: {ts}")
     return ts
+
 
 def find_template_on_screen(template, threshold=0.9):
     """Ищет шаблон на экране, возвращает координаты центра найденного объекта."""
@@ -45,6 +47,7 @@ def find_template_on_screen(template, threshold=0.9):
         return center  # Возвращаем центр объекта
     logging.debug("Шаблон не найден.")
     return None
+
 
 # 1. Поиск первой картинки (DostupKoleso)
 while True:
@@ -71,6 +74,7 @@ for step in ["IconCasino", "InterfaceKolesa", "ButtonKoloso"]:
 
         if pos:
             x, y = pos
+            pyautogui.moveTo(x, y, duration=0.2)  # Двигаем мышь к найденной области
             pyautogui.click(x, y)  # Кликаем по найденной области
             logging.info(f"Клик по {step} в координатах: {x}, {y}")
             print(f"Клик по {step}.png в координатах: {x}, {y}")
@@ -79,6 +83,32 @@ for step in ["IconCasino", "InterfaceKolesa", "ButtonKoloso"]:
             logging.debug(f"{step} не найден, продолжаем поиск...")
             print(f"{step}.png не найден, продолжаем поиск...")
 
-# 5. Ожидание 20 секунд и финальный скриншот
+# 5. Ожидание 20 секунд, клик по последнему шаблону и финальный скриншот
+time.sleep(5)  # Небольшая задержка перед кликом по последнему элементу
+pos_last = find_template_on_screen(templates["ButtonKoloso"])
+
+if pos_last:
+    x, y = pos_last
+    pyautogui.moveTo(x, y, duration=0.2)  # Двигаем мышь к центру ButtonKoloso
+    pyautogui.click(x, y)  # Клик по центру ButtonKoloso
+    logging.info(f"Клик по ButtonKoloso в координатах: {x}, {y}")
+    print(f"Клик по ButtonKoloso в координатах: {x}, {y}")
+
+# Ждем 20 секунд перед финальным скриншотом
 time.sleep(20)
-logging.info("Финальный скриншот сохранён после 20 секунд ожидания.")
+
+# Делаем финальный скриншот
+timestamp = get_timestamp()
+screenshot_path = f"../../../screenshots/{timestamp}_final_screenshot.png"
+pyautogui.screenshot(screenshot_path)
+logging.info(f"Финальный скриншот сохранён по пути: {screenshot_path}")
+
+# Нажимаем дважды ESC и BACKSPACE
+pyautogui.press('esc')
+logging.info("Нажата клавиша ESC.")
+time.sleep(0.5)
+pyautogui.press('esc')
+logging.info("Нажата клавиша ESC ещё раз.")
+time.sleep(0.5)
+pyautogui.press('backspace')
+logging.info("Нажата клавиша BACKSPACE.")
