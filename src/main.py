@@ -1,18 +1,17 @@
+import hashlib
 import sys
-import requests
-from telegram.ext import Updater, CommandHandler
-from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ParseMode
-
-import ctypes
 import os
+import json
+import time
 import subprocess
 import datetime
+import ctypes
 import uuid
 import platform
-import hashlib
-import json
 import threading
-from telegram.ext import (CallbackContext, MessageHandler, Filters)
+import requests
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ParseMode
+from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
@@ -21,6 +20,9 @@ from PySide6.QtWidgets import (
     QDialog, QSizePolicy, QMessageBox, QComboBox
 )
 
+# --------------------------
+# Общие настройки и функции
+# --------------------------
 SERVER_URL = "http://83.220.165.162:5000"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if os.path.isdir(os.path.join(BASE_DIR, "src")):
@@ -54,42 +56,6 @@ def save_settings(settings):
     with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
         json.dump(settings, f, indent=4)
     print("Настройки сохранены.")
-
-MODULES_BASE = None
-if os.path.isdir(os.path.join(BASE_DIR, "modules")):
-    MODULES_BASE = os.path.join(BASE_DIR, "modules")
-elif os.path.isdir(os.path.join(BASE_DIR, "src", "modules")):
-    MODULES_BASE = os.path.join(BASE_DIR, "src", "modules")
-else:
-    raise FileNotFoundError("Не найдена папка modules")
-
-sys.path.append(os.path.join(MODULES_BASE, "ProcessChecker"))
-import process_checker
-
-# Пути к скриптам
-ANTIAFK_PATH     = os.path.join(MODULES_BASE, "AntiAfkService", "antiafk.py")
-KRUTKAKOLES_PATH = os.path.join(MODULES_BASE, "AntiAfkService", "krutkakoles.py")
-LOTTERY_PATH     = os.path.join(MODULES_BASE, "AntiAfkService", "lottery.py")
-COOK_PATH        = os.path.join(MODULES_BASE, "CraftService", "cook.py")
-WAXTA_PATH       = os.path.join(MODULES_BASE, "WorkService", "waxta.py")
-PORT_PATH        = os.path.join(MODULES_BASE, "WorkService", "port.py")
-STROYKA_PATH     = os.path.join(MODULES_BASE, "WorkService", "stroyka.py")
-KOZLODOY_PATH    = os.path.join(MODULES_BASE, "WorkService", "kozlodoy.py")
-AUTORUN_PATH     = os.path.join(MODULES_BASE, "OtherService", "autorun.py")
-AUTOMOOD_PATH    = os.path.join(MODULES_BASE, "OtherService", "automood.py")
-AUTOEAT_PATH     = os.path.join(MODULES_BASE, "OtherService", "autoeat.py")
-KACHALKA_PATH    = os.path.join(MODULES_BASE, "OtherService", "kachalka.py")
-KOSYAKI_PATH     = os.path.join(MODULES_BASE, "CraftService", "kosyaki.py")
-TAXI_PATH        = os.path.join(MODULES_BASE, "WorkService", "Taxi.py")
-FIREMAN_PATH     = os.path.join(MODULES_BASE, "WorkService", "fireman.py")
-SHVEIKA_PATH     = os.path.join(MODULES_BASE, "MiniGamesService", "Shveika.py")
-SKOLZKAYA_PATH   = os.path.join(MODULES_BASE, "MiniGamesService", "Skolzkaya.py")
-SCHEMS_PATH      = os.path.join(MODULES_BASE, "MiniGamesService", "Schems.py")
-RECONNECT_PATH   = os.path.join(MODULES_BASE, "OtherService", "reconect.py")
-DEMORGAN_PATH    = os.path.join(MODULES_BASE, "TuragaService", "ShveiaDemorgan.py")
-TOCHILKA_PATH    = os.path.join(MODULES_BASE, "TuragaService", "Tochilka.py")
-
-PYTHON_EXEC = sys.executable
 
 def get_device_id():
     return hex(uuid.getnode())
@@ -150,12 +116,54 @@ def save_license(key, expiry_date):
     except Exception as e:
         print(f"❌ Ошибка при сохранении лицензии: {e}")
 
+# Пути к вспомогательным скриптам
+MODULES_BASE = None
+if os.path.isdir(os.path.join(BASE_DIR, "modules")):
+    MODULES_BASE = os.path.join(BASE_DIR, "modules")
+elif os.path.isdir(os.path.join(BASE_DIR, "src", "modules")):
+    MODULES_BASE = os.path.join(BASE_DIR, "src", "modules")
+else:
+    raise FileNotFoundError("Не найдена папка modules")
+
+# Добавляем путь к модулю ProcessChecker
+sys.path.append(os.path.join(MODULES_BASE, "ProcessChecker"))
+import process_checker
+
+# Пути к скриптам сервисов
+ANTIAFK_PATH     = os.path.join(MODULES_BASE, "AntiAfkService", "antiafk.py")
+KRUTKAKOLES_PATH = os.path.join(MODULES_BASE, "AntiAfkService", "krutkakoles.py")
+LOTTERY_PATH     = os.path.join(MODULES_BASE, "AntiAfkService", "lottery.py")
+COOK_PATH        = os.path.join(MODULES_BASE, "CraftService", "cook.py")
+WAXTA_PATH       = os.path.join(MODULES_BASE, "WorkService", "waxta.py")
+PORT_PATH        = os.path.join(MODULES_BASE, "WorkService", "port.py")
+STROYKA_PATH     = os.path.join(MODULES_BASE, "WorkService", "stroyka.py")
+KOZLODOY_PATH    = os.path.join(MODULES_BASE, "WorkService", "kozlodoy.py")
+AUTORUN_PATH     = os.path.join(MODULES_BASE, "OtherService", "autorun.py")
+AUTOMOOD_PATH    = os.path.join(MODULES_BASE, "OtherService", "automood.py")
+AUTOEAT_PATH     = os.path.join(MODULES_BASE, "OtherService", "autoeat.py")
+KACHALKA_PATH    = os.path.join(MODULES_BASE, "OtherService", "kachalka.py")
+KOSYAKI_PATH     = os.path.join(MODULES_BASE, "CraftService", "kosyaki.py")
+TAXI_PATH        = os.path.join(MODULES_BASE, "WorkService", "Taxi.py")
+FIREMAN_PATH     = os.path.join(MODULES_BASE, "WorkService", "fireman.py")
+SHVEIKA_PATH     = os.path.join(MODULES_BASE, "MiniGamesService", "Shveika.py")
+SKOLZKAYA_PATH   = os.path.join(MODULES_BASE, "MiniGamesService", "Skolzkaya.py")
+SCHEMS_PATH      = os.path.join(MODULES_BASE, "MiniGamesService", "Schems.py")
+RECONNECT_PATH   = os.path.join(MODULES_BASE, "OtherService", "reconect.py")
+DEMORGAN_PATH    = os.path.join(MODULES_BASE, "TuragaService", "ShveiaDemorgan.py")
+TOCHILKA_PATH    = os.path.join(MODULES_BASE, "TuragaService", "Tochilka.py")
+FULL_RECONNECT_PATH = os.path.join(MODULES_BASE, "OtherService", "fullreconect.py")
+
+PYTHON_EXEC = sys.executable
+
+# --------------------------
+# Класс основного приложения
+# --------------------------
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Менеджер сервисов бота")
         self.setGeometry(100, 100, 900, 600)
-        # Обновлённый словарь процессов
+        # Словарь процессов
         self.processes = {
             "antiafk": None,
             "koleso": None,
@@ -180,25 +188,24 @@ class MainWindow(QMainWindow):
             "demorgan": None,
             "tochilka": None
         }
-
         self.inactive_counter = 0
         self.bots_killed_due_to_inactivity = False
-
         self.license_expiry = load_license()
 
+        # Таймеры проверки лицензии и раскладки клавиатуры
         self.license_check_timer = QTimer(self)
         self.license_check_timer.timeout.connect(self.periodic_license_check)
         self.license_check_timer.start(3600000)
-
         self.keyboard_timer = QTimer(self)
         self.keyboard_timer.timeout.connect(self.check_keyboard_layout)
         self.keyboard_timer.start(10000)
 
+        # Основной макет
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
 
-        # Создаем левое меню
+        # Левое меню
         left_panel = QWidget()
         left_panel.setSizePolicy(left_panel.sizePolicy().horizontalPolicy(), QSizePolicy.Expanding)
         left_layout = QVBoxLayout(left_panel)
@@ -207,28 +214,18 @@ class MainWindow(QMainWindow):
             "font-size: 18px;"
             "QListWidget::item:selected { background-color: #ff7043; border: 4px solid #ff7043; }"
         )
-        # Обновленный порядок пунктов меню
-        self.menu_list.addItem("Начало")
-        self.menu_list.addItem("Anti-AFK")
-        self.menu_list.addItem("Работы")
-        self.menu_list.addItem("Крафты")
-        self.menu_list.addItem("Пассивные функции")
-        self.menu_list.addItem("Контракты")
-        self.menu_list.addItem("Спортзал")
-        self.menu_list.addItem("Деморган")
-        self.menu_list.addItem("Настройки")
-        self.menu_list.addItem("Телеграмм")
+        # Пункты меню в требуемом порядке
+        for item in ["Начало", "Anti-AFK", "Работы", "Крафты", "Пассивные функции", "Контракты", "Спортзал", "Деморган", "Настройки", "Телеграмм"]:
+            self.menu_list.addItem(item)
         self.menu_list.currentRowChanged.connect(self.switch_page)
         left_layout.addWidget(self.menu_list)
-
         self.license_label = QLabel()
         self.license_label.setStyleSheet("font-size: 14px; color: #ff7043;")
         left_layout.addWidget(self.license_label)
         left_layout.setAlignment(self.license_label, Qt.AlignBottom)
-
         main_layout.addWidget(left_panel, 1)
 
-        # Создаем страницы
+        # Страницы
         self.pages = QStackedWidget()
         self.page_home = self.create_home_page()
         self.page_antiafk = self.create_antiafk_page()
@@ -241,25 +238,17 @@ class MainWindow(QMainWindow):
         self.page_settings = self.create_settings_page()
         self.tg_page = self.create_tg_page()
 
-        # Добавляем страницы в нужном порядке
-        self.pages.addWidget(self.page_home)       # 0: Начало
-        self.pages.addWidget(self.page_antiafk)      # 1: Anti-AFK
-        self.pages.addWidget(self.page_work)         # 2: Работы
-        self.pages.addWidget(self.page_cook)         # 3: Крафты
-        self.pages.addWidget(self.page_automood)     # 4: Пассивные функции
-        self.pages.addWidget(self.page_contracts)    # 5: Контракты
-        self.pages.addWidget(self.page_sportzal)       # 6: Спортзал
-        self.pages.addWidget(self.page_demorgan)       # 7: Деморган
-        self.pages.addWidget(self.page_settings)       # 8: Настройки
-        self.pages.addWidget(self.tg_page)             # 9: Телеграмм
-
+        # Добавляем страницы в правильном порядке:
+        for page in [self.page_home, self.page_antiafk, self.page_work, self.page_cook,
+                     self.page_automood, self.page_contracts, self.page_sportzal,
+                     self.page_demorgan, self.page_settings, self.tg_page]:
+            self.pages.addWidget(page)
         main_layout.addWidget(self.pages, 3)
         self.switch_page(0)
 
         self.game_timer = QTimer(self)
         self.game_timer.timeout.connect(self.check_game_active)
         self.game_timer.start(1000)
-
         self.license_timer = QTimer(self)
         self.license_timer.timeout.connect(self.update_license_label)
         self.license_timer.start(1000)
@@ -271,9 +260,23 @@ class MainWindow(QMainWindow):
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet("font-size: 24px; font-weight: bold;")
         layout.addWidget(title)
-        description = QLabel("Это менеджер сервисов бота.\nВыберите нужную функцию в меню слева.")
+        description = QLabel(
+            "Менеджер сервисов бота\n\n"
+            "Функции:\n"
+            "1. Anti-AFK – удержание активности персонажа.\n"
+            "2. Работы – выполнение игровых работ.\n"
+            "3. Крафты – автоматизация создания блюд и обработки предметов.\n"
+            "4. Пассивные функции – авто-настроение, авто-бег, авто-еда.\n"
+            "5. Контракты – выполнение контрактов и запуск мини-игр.\n"
+            "6. Спортзал – тренировка персонажа.\n"
+            "7. Деморган – автоматизация (Пошив Формы, Токарка).\n"
+            "8. Настройки – задание параметров (пароль, персонаж, спаун, путь до ярлыка Rage MP).\n"
+            "9. Телеграмм – управление ботом через Telegram.\n\n"
+            "Используйте меню слева для навигации."
+        )
         description.setAlignment(Qt.AlignCenter)
-        description.setStyleSheet("font-size: 18px;")
+        description.setStyleSheet("font-size: 16px; color: black;")
+        description.setWordWrap(True)
         layout.addWidget(description)
         layout.addStretch()
         return widget
@@ -1077,8 +1080,10 @@ class MainWindow(QMainWindow):
         if checked:
             try:
                 settings_path = os.path.join(PROJECT_ROOT, "settings.json")
-                proc = subprocess.Popen([PYTHON_EXEC, RECONNECT_PATH, settings_path],
-                                        cwd=os.path.dirname(RECONNECT_PATH))
+                proc = subprocess.Popen(
+                    [PYTHON_EXEC, RECONNECT_PATH, settings_path],
+                    cwd=os.path.dirname(RECONNECT_PATH)
+                )
                 self.processes["reconnect"] = proc
                 print("Reconnect запущен, PID:", proc.pid)
             except Exception as e:
@@ -1093,6 +1098,30 @@ class MainWindow(QMainWindow):
                     print("Reconnect остановлен.")
                 except Exception as e:
                     print("Ошибка при остановке reconnect:", e)
+
+    def manual_reconnect(self):
+        # Если процесс уже запущен, завершаем его
+        if self.processes.get("reconnect") is not None:
+            try:
+                proc = self.processes["reconnect"]
+                proc.terminate()
+                proc.wait()
+                self.processes["reconnect"] = None
+                print("Предыдущий процесс reconnect остановлен.")
+            except Exception as e:
+                print("Ошибка при остановке предыдущего reconnect:", e)
+        try:
+            settings_path = os.path.join(PROJECT_ROOT, "settings.json")
+            proc = subprocess.Popen(
+                [PYTHON_EXEC, RECONNECT_PATH, settings_path],
+                cwd=os.path.dirname(RECONNECT_PATH)
+            )
+            self.processes["reconnect"] = proc
+            print("Manual Reconnect запущен, PID:", proc.pid)
+            return True
+        except Exception as e:
+            print("Ошибка при ручном запуске reconnect:", e)
+            return False
 
     def check_game_active(self):
         if process_checker.is_game_active():
@@ -1119,10 +1148,6 @@ class MainWindow(QMainWindow):
             self.work_hint_label.setText("Ошибка: введите корректный путь до Rage MP")
 
     def toggle_launch_game(self):
-        # Проверка активности игры с помощью process_checker
-        if process_checker.is_game_active():
-            QMessageBox.information(self, "Информация", "Игра уже запущена!")
-            return
         shortcut_path = self.rage_mp_path_input.text().strip()
         if not shortcut_path:
             QMessageBox.critical(self, "Ошибка", "Пожалуйста, введите путь до ярлыка Rage MP!")
@@ -1130,9 +1155,11 @@ class MainWindow(QMainWindow):
         if not os.path.exists(shortcut_path) or not shortcut_path.lower().endswith(".lnk"):
             QMessageBox.critical(self, "Ошибка", "Неверный путь или расширение файла! Укажите ярлык (.lnk).")
             return
+        # Запускаем внешний скрипт fullreconect.py, который выполнит всю логику запуска игры.
         try:
-            os.startfile(shortcut_path, "runas")
-            print("Игра запущена через ярлык.")
+            proc = subprocess.Popen([PYTHON_EXEC, FULL_RECONNECT_PATH],
+                                    cwd=os.path.dirname(FULL_RECONNECT_PATH))
+            print("Запуск игры через fullreconect запущен, PID:", proc.pid)
         except Exception as e:
             QMessageBox.critical(self, "Ошибка запуска", f"Не удалось запустить игру: {e}")
 
@@ -1290,11 +1317,10 @@ def run_telegram_bot():
                 window.toggle_lottery(False)
                 update.message.reply_text("🎟 <b>Лотерея</b> остановлена.", parse_mode=ParseMode.HTML)
         elif text == "♻️ Реконнект":
-            window.toggle_reconnect(not window.processes.get("reconnect") is None)
-            if window.processes["reconnect"] is None:
-                update.message.reply_text("♻️ <b>Реконнект</b> остановлен.", parse_mode=ParseMode.HTML)
+            if window.manual_reconnect():
+                update.message.reply_text("♻️ <b>Реконнект</b> запущен немедленно.", parse_mode=ParseMode.HTML)
             else:
-                update.message.reply_text("♻️ <b>Реконнект</b> запущен.", parse_mode=ParseMode.HTML)
+                update.message.reply_text("♻️ <b>Реконнект</b>: произошла ошибка.", parse_mode=ParseMode.HTML)
         else:
             update.message.reply_text("Неизвестная команда. Нажмите /start, чтобы открыть меню.", parse_mode=ParseMode.HTML)
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, msg_handler))

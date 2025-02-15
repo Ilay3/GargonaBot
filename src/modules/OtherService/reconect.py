@@ -2,11 +2,10 @@ import json
 import time
 import pyautogui
 import os
-from datetime import datetime
+from datetime import datetime, time as dtime, timedelta
 import pytz
 
 SETTINGS_PATH = '../../../settings.json'  # Путь к файлу настроек
-
 
 def load_settings(path=SETTINGS_PATH):
     if not os.path.exists(path):
@@ -19,11 +18,9 @@ def load_settings(path=SETTINGS_PATH):
             print("Ошибка: Некорректный формат settings.json. Создаю новый.")
             return {}
 
-
 def save_settings(path, settings):
     with open(path, 'w', encoding='utf-8') as file:
         json.dump(settings, file, indent=4, ensure_ascii=False)
-
 
 def find_and_click(image_name, offset_x=0, offset_y=0, confidence=0.8):
     image_path = os.path.join('../../../resources/images/ImgReconect', image_name)
@@ -41,26 +38,29 @@ def find_and_click(image_name, offset_x=0, offset_y=0, confidence=0.8):
 
 
 def wait_for_correct_time():
-    # Получаем текущее время в московской зоне
     moscow_tz = pytz.timezone('Europe/Moscow')
-    while True:
-        current_time = datetime.now(moscow_tz).strftime('%H:%M')
-        if current_time == '07:10':
-            print("Время 7:10 утра! Начинаю выполнение скрипта.")
-            break
-        else:
-            print(f"Текущее время: {current_time}. Ожидаю 7:10 утра...")
-        time.sleep(60)  # Проверяем время каждую минуту
+    target = dtime(7, 10)
+    now = datetime.now(moscow_tz)
+
+    # Если текущее время >= 07:10, то ждем до 7:10 следующего дня
+    if now.time() >= target:
+        tomorrow = now.date() + timedelta(days=1)
+        target_dt = moscow_tz.localize(datetime.combine(tomorrow, target))
+    else:
+        target_dt = moscow_tz.localize(datetime.combine(now.date(), target))
+
+    while datetime.now(moscow_tz) < target_dt:
+        current = datetime.now(moscow_tz)
+        print(f"Текущее время: {current.strftime('%H:%M')}. Ожидаю {target_dt.strftime('%H:%M')}...")
+        time.sleep(60)
+    print(f"Время {target_dt.strftime('%H:%M')}! Начинаю выполнение скрипта.")
 
 
 def run_script(settings, wait_until_710=False):
     if wait_until_710:
-        wait_for_correct_time()  # Ждем, пока не наступит 7:10 утра
+        wait_for_correct_time()  # Ждем до 7:10 утра
 
-    # Предполагается, что settings содержит ключи:
-    # "password" – строка пароля,
-    # "character" – "First", "Second" или "Third",
-    # "spawn"     – "Dom", "Kvartira", "Spawn" или "Lasttochka".
+    # Проверка настроек
     if 'password' not in settings or not settings['password']:
         raise ValueError("Пароль не задан в настройках.")
     if 'character' not in settings or settings['character'] not in ["First", "Second", "Third"]:
@@ -122,20 +122,9 @@ def run_script(settings, wait_until_710=False):
     else:
         print("Ошибка: Картинка 3 не найдена")
 
-
 if __name__ == "__main__":
     settings = load_settings()
-
-    # Спрашиваем пользователя, какой способ запуска он выбирает
-    choice = input(
-        "Какой способ запуска вам нужен? Введите '1' для немедленного запуска или '2' для ожидания 7:10 утра: ")
-
-    if choice == '2':
-        wait_until_710 = True
-        print("Ожидаю 7:10 утра...")
-    else:
-        wait_until_710 = False
-        print("Скрипт начнется немедленно.")
-
-    # Запускаем скрипт с выбранным способом запуска
+    # Принудительно всегда ждем 7:10
+    wait_until_710 = True
+    print("Ожидаю 7:10 утра...")
     run_script(settings, wait_until_710)
