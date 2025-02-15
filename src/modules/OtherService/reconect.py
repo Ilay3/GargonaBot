@@ -4,18 +4,42 @@ import pyautogui
 import os
 from PIL import Image
 
+SETTINGS_PATH = '../../../settings.json'  # Путь к файлу настроек
 
-# Функция для загрузки настроек из settings.json
+
 def load_settings(path):
+    if not os.path.exists(path):
+        print("Файл settings.json не найден. Создаю новый.")
+        return {}
+
     with open(path, 'r', encoding='utf-8') as file:
-        return json.load(file)
+        try:
+            return json.load(file)
+        except json.JSONDecodeError:
+            print("Ошибка: Некорректный формат settings.json. Создаю новый.")
+            return {}
 
 
-# Функция для поиска изображения на экране и клика по его центру
+def save_settings(path, settings):
+    with open(path, 'w', encoding='utf-8') as file:
+        json.dump(settings, file, indent=4, ensure_ascii=False)
+
+
+def get_user_input(settings):
+    if 'password' not in settings or not settings['password']:
+        settings['password'] = input("Введите пароль: ")
+
+    if 'character' not in settings or settings['character'] not in ["First", "Second", "Third"]:
+        settings['character'] = input("Выберите персонажа (First, Second, Third): ")
+
+    if 'spawn' not in settings or settings['spawn'] not in ["Dom", "Kvartira", "Spawn", "Lasttochka"]:
+        settings['spawn'] = input("Выберите точку спауна (Dom, Kvartira, Spawn, Lasttochka): ")
+
+    save_settings(SETTINGS_PATH, settings)
+
+
 def find_and_click(image_name, offset_x=0, offset_y=0, confidence=0.8):
-    image_path = os.path.join('../../../resources/images/ImgReconect',
-                              image_name)  # Укажите путь к директории с изображениями
-
+    image_path = os.path.join('../../../resources/images/ImgReconect', image_name)
     while True:
         try:
             location = pyautogui.locateCenterOnScreen(image_path, confidence=confidence)
@@ -26,98 +50,61 @@ def find_and_click(image_name, offset_x=0, offset_y=0, confidence=0.8):
                 return True
         except pyautogui.ImageNotFoundException:
             print(f"Не удалось найти {image_name}, пробую снова...")
+        time.sleep(1)
 
-        time.sleep(1)  # Пауза между попытками
 
+def main():
+    settings = load_settings(SETTINGS_PATH)
+    get_user_input(settings)
 
-# Основная логика программы
-def main(settings_path):
-    settings = load_settings(settings_path)
-
-    # Нажатие F1
     pyautogui.press('f1')
     time.sleep(1)
 
-    # Поиск и нажатие на картинку 1
     if find_and_click('image1.png'):
         time.sleep(1)
-
-        # Поиск и нажатие на картинку 2
         if find_and_click('image2.png'):
             time.sleep(1)
-
-            # Поиск и нажатие на дополнительную картинку (например, image5.png)
             if not find_and_click('image6.png'):
                 print("Ошибка: Дополнительная картинка не найдена")
-                return  # Останавливаем выполнение, если дополнительная картинка не найдена
-
-            print("Дополнительная картинка найдена и нажата.")
+                return
             time.sleep(1)
-
-            # Поиск и нажатие на картинку 3 с отступом по X
             if find_and_click('image3.png', offset_x=30):
                 time.sleep(1)
-
-                # Ввод пароля
                 pyautogui.write(settings['password'])
                 time.sleep(1)
-
-                # Поиск и нажатие на дополнительную кнопку после ввода пароля
                 if not find_and_click('image5.png'):
                     print("Ошибка: Дополнительная кнопка не найдена")
                     time.sleep(5)
                 else:
-                    print("Дополнительная кнопка найдена и нажата.")
                     time.sleep(10)
-
-                # Определение координат для выбора персонажа
                 character_positions = {
                     "First": (1565, 368),
                     "Second": (1565, 526),
                     "Third": (1565, 695)
                 }
-
-                character = settings['character']
-                if character in character_positions:
-                    x, y = character_positions[character]
+                if settings['character'] in character_positions:
+                    x, y = character_positions[settings['character']]
                     pyautogui.click(x, y)
                     time.sleep(1)
-
-                    # Поиск и нажатие на картинку 4
                     if not find_and_click('image4.png'):
                         print("Ошибка: Картинка 4 не найдена")
                 else:
                     print("Ошибка: Некорректное значение character в settings.json")
-
-                # Чтение точки спауна из settings.json
-                spawn = settings.get('spawn', 'Dom')  # Если в JSON нет ключа 'spawn', по умолчанию будет 'Dom'
-
-                # Словарь картинок для каждой точки спауна
                 spawn_images = {
                     "Dom": ['dom.png'],
                     "Kvartira": ['kvartira.png'],
                     "Spawn": ['spawn.png'],
                     "Lasttochka": ['lasttochka.png']
                 }
-
-                # Получаем список картинок для выбранной точки спауна
-                images_to_search = spawn_images.get(spawn, spawn_images['Dom'])  # По умолчанию используем 'Dom'
-
-                # Последовательное распознавание и клик по картинкам
-                for image in images_to_search:
+                for image in spawn_images.get(settings['spawn'], spawn_images['Dom']):
                     if not find_and_click(image):
                         print(f"Ошибка: {image} не найдена")
-                        break  # Прерываем, если картинка не найдена
-                    print(f"{image} найдена и нажата.")
+                        break
                     time.sleep(1)
-
-                # Дополнительное распознавание и клик по картинке после выбора точки спауна
-                additional_image = 'image7.png'  # Укажите название картинки для проверки
-                if find_and_click(additional_image):
-                    print(f"{additional_image} найдена и нажата.")
+                if find_and_click('image7.png'):
+                    print("image7.png найдена и нажата.")
                 else:
-                    print(f"Ошибка: {additional_image} не найдена")
-
+                    print("Ошибка: image7.png не найдена")
             else:
                 print("Ошибка: Картинка 3 не найдена")
         else:
@@ -127,5 +114,4 @@ def main(settings_path):
 
 
 if __name__ == "__main__":
-    settings_path = '../../../settings.json'  # Укажите путь к файлу
-    main(settings_path)
+    main()
