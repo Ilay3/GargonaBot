@@ -216,8 +216,6 @@ class MainWindow(QMainWindow):
 
         }
 
-        self.start_telegram_bot_automatically()
-
         self.inactive_counter = 0
         self.bots_killed_due_to_inactivity = False
 
@@ -1164,56 +1162,27 @@ class MainWindow(QMainWindow):
             settings = load_settings()
             settings["rage_mp_path"] = rage_mp_path
             save_settings(settings)
-            # Можно показать сообщение, например, через work_hint_label или QMessageBox
             self.work_hint_label.setText(f"Настройки сохранены: Rage MP = {rage_mp_path}")
         else:
             self.work_hint_label.setText("Ошибка: введите корректный путь до Rage MP")
 
     def toggle_launch_game(self):
-        # Получаем путь до ярлыка Rage MP, введённый пользователем
         shortcut_path = self.rage_mp_path_input.text().strip()
         if not shortcut_path:
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, "Ошибка", "Пожалуйста, введите путь до ярлыка Rage MP!")
             return
-        # Проверяем, что файл существует и имеет правильное расширение
         if not os.path.exists(shortcut_path) or not shortcut_path.lower().endswith(".lnk"):
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, "Ошибка", "Неверный путь или расширение файла! Укажите ярлык (.lnk).")
             return
         try:
-            # Запускаем ярлык с правами администратора
             os.startfile(shortcut_path, "runas")
             print("Игра запущена через ярлык.")
         except Exception as e:
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, "Ошибка запуска", f"Не удалось запустить игру: {e}")
 
-    def start_telegram_bot_automatically(self):
-        settings = load_settings()
-        token = settings.get("telegram_token", "")
-        chat_id = settings.get("telegram_chat_id", "")
-        if token and chat_id:
-            try:
-                # Попытка запустить telegram_bot.py, если он существует
-                telegram_bot_path = os.path.join(MODULES_BASE, "OtherService", "telegram_bot.py")
-                if os.path.exists(telegram_bot_path):
-                    wd = os.path.dirname(telegram_bot_path)
-                    proc = subprocess.Popen([PYTHON_EXEC, telegram_bot_path, token], cwd=wd)
-                    self.processes["telegram_bot"] = proc
-                    print("Telegram бот запущен, PID:", proc.pid)
-                else:
-                    print("telegram_bot.py не найден – пропускаем запуск скрипта.")
-                # Отправляем сообщение через Telegram API
-                url = f"https://api.telegram.org/bot{token}/sendMessage"
-                payload = {"chat_id": chat_id, "text": "Авторизация успешна, Telegram бот запущен."}
-                response = requests.post(url, data=payload)
-                if response.status_code == 200:
-                    print("Сообщение отправлено в Telegram.")
-                else:
-                    print(f"Ошибка отправки сообщения: {response.text}")
-            except Exception as e:
-                print(f"Ошибка при автоматическом запуске Telegram бота: {e}")
 
     def kill_all_bots(self):
         for key in self.processes:
@@ -1244,15 +1213,102 @@ class MainWindow(QMainWindow):
             self.chk_autorun.setChecked(False)
         self.work_hint_label.setText("")
 
-
-
 ##################### NEW: Flask endpoints, using the window object #####################
 @flask_app.route("/toggle_antiafk", methods=["GET"])
 def route_toggle_antiafk():
-    global window  # если window объявлен как глобальный
-    window.toggle_antiafk()
-    return "toggled!", 200
+    global window
+    # Допустим, antiafk считается «запущенным», если window.processes["antiafk"] не None
+    was_running = (window.processes["antiafk"] is not None)
+    window.toggle_antiafk()  # это «переключает» состояние
+    is_running = (window.processes["antiafk"] is not None)
 
+    if not was_running and is_running:
+        return "запущено", 200
+    elif was_running and not is_running:
+        return "остановлено", 200
+    else:
+        return "toggled!", 200
+
+
+@flask_app.route("/toggle_koleso", methods=["GET"])
+def route_toggle_koleso():
+    global window
+    was_running = (window.processes["koleso"] is not None)
+    if was_running:
+        # Останавливаем
+        try:
+            window.processes["koleso"].terminate()
+            window.processes["koleso"].wait()
+            window.processes["koleso"] = None
+            return "остановлено", 200
+        except:
+            return "ошибка при остановке", 200
+    else:
+        # Запускаем
+        wd = os.path.dirname(KRUTKAKOLES_PATH)
+        try:
+            proc = subprocess.Popen([PYTHON_EXEC, KRUTKAKOLES_PATH], cwd=wd)
+            window.processes["koleso"] = proc
+            return "запущено", 200
+        except:
+            return "ошибка при запуске", 200
+
+@flask_app.route("/toggle_lottery", methods=["GET"])
+def route_toggle_lottery():
+    global window
+    was_running = (window.processes["lottery"] is not None)
+    if was_running:
+        # Останавливаем
+        try:
+            window.processes["lottery"].terminate()
+            window.processes["lottery"].wait()
+            window.processes["lottery"] = None
+            return "остановлено", 200
+        except:
+            return "ошибка при остановке", 200
+    else:
+        # Запускаем
+        wd = os.path.dirname(LOTTERY_PATH)
+        try:
+            proc = subprocess.Popen([PYTHON_EXEC, LOTTERY_PATH], cwd=wd)
+            window.processes["lottery"] = proc
+            return "запущено", 200
+        except:
+            return "ошибка при запуске", 200
+
+
+@flask_app.route("/toggle_reconnect", methods=["GET"])
+def route_toggle_reconnect():
+    global window
+
+    # Проверим, запущен ли уже reconnect
+    if window.processes.get("reconnect") is not None:
+        # Останавливаем
+        proc = window.processes["reconnect"]
+        try:
+            proc.terminate()  # Грубое завершение
+            proc.wait()
+            window.processes["reconnect"] = None
+            return "остановлено", 200
+        except:
+            return "ошибка при остановке", 200
+    else:
+
+        try:
+            script_path = os.path.join(MODULES_BASE, "OtherService", "reconect.py")
+
+            # или где у вас лежит reconnect.py
+            settings_path = os.path.join(PROJECT_ROOT, "settings.json")
+
+            proc = subprocess.Popen(
+                [PYTHON_EXEC, script_path, settings_path],
+                cwd=os.path.dirname(script_path)
+            )
+            window.processes["reconnect"] = proc
+            return "запущено", 200
+        except Exception as e:
+            print("Ошибка запуска reconnect:", e)
+            return "ошибка при запуске", 200
 
 ##################### NEW: Функции запуска Flask и Telegram-бота ########################
 def run_flask_server():
@@ -1262,92 +1318,54 @@ def run_telegram_bot():
     s = load_settings()
     token = s.get("telegram_token", "")
     if not token:
-        print("Нет 'telegram_token' в settings.json, не запускаем бота.")
+        print(">>> Нет 'telegram_token' в settings.json, не запускаем бота.")
         return
 
     updater = Updater(token, use_context=True)
     dp = updater.dispatcher
 
-    # 1. Команда /start
     def cmd_start(update: Update, context: CallbackContext):
-        # Создаём список списков. Каждая вложенная — это ряд кнопок.
-        # Например, одна строка с тремя кнопками.
         keyboard = [
-            [KeyboardButton("AntiAFK")],
-            [KeyboardButton("StopAll")]
+            [KeyboardButton("Anti-AFK"), KeyboardButton("Крутка колеса"), KeyboardButton("Лотерея")],
+            [KeyboardButton("Реконнект")]  # <-- новая кнопка
         ]
         reply_markup = ReplyKeyboardMarkup(
             keyboard,
-            resize_keyboard=True,    # чтобы клавиатура подстраивалась по размеру
-            one_time_keyboard=False  # False = клавиатура остаётся, пока пользователь сам не уберёт
+            resize_keyboard=True,
+            one_time_keyboard=False
         )
         update.message.reply_text(
-            "Привет! Это бот для управления процессами.\n"
-            "Нажми на кнопку, чтобы запустить или остановить процесс:",
+            "Привет! Выберите действие:",
             reply_markup=reply_markup
         )
 
     dp.add_handler(CommandHandler("start", cmd_start))
 
-    # 2. Обработчик входящих сообщений с текстом (когда жмут на кнопки, приходит текст)
     def msg_handler(update: Update, context: CallbackContext):
-        user_text = update.message.text  # что пользователь отправил (нажал)
-        chat_id = update.effective_chat.id
+        text = update.message.text
 
-        if user_text == "AntiAFK":
-            # Отправляем запрос к Flask /toggle_antiafk
-            try:
-                r = requests.get("http://127.0.0.1:5001/toggle_antiafk")
-                if r.status_code == 200:
-                    # допустим, возвращает "запущен" или "остановлен"
-                    update.message.reply_text(f"AntiAFK: {r.text}")
-                else:
-                    update.message.reply_text(f"Ошибка: {r.status_code} {r.text}")
-            except Exception as e:
-                update.message.reply_text(f"Исключение: {e}")
+        if text == "Anti-AFK":
+            requests.get("http://127.0.0.1:5001/toggle_antiafk")
 
-        elif user_text == "Cook":
-            try:
-                r = requests.get("http://127.0.0.1:5001/toggle_cook")
-                if r.status_code == 200:
-                    update.message.reply_text(f"Cook: {r.text}")
-                else:
-                    update.message.reply_text(f"Ошибка: {r.status_code} {r.text}")
-            except Exception as e:
-                update.message.reply_text(f"Исключение: {e}")
+        elif text == "Крутка колеса":
+            requests.get("http://127.0.0.1:5001/toggle_koleso")
 
-        elif user_text == "Lottery":
-            try:
-                r = requests.get("http://127.0.0.1:5001/toggle_lottery")
-                if r.status_code == 200:
-                    update.message.reply_text(f"Lottery: {r.text}")
-                else:
-                    update.message.reply_text(f"Ошибка: {r.status_code} {r.text}")
-            except Exception as e:
-                update.message.reply_text(f"Исключение: {e}")
+        elif text == "Лотерея":
+            requests.get("http://127.0.0.1:5001/toggle_lottery")
 
-        elif user_text == "StopAll":
-            # Может быть, у вас есть эндпоинт /kill_all_bots
+        elif text == "Реконнект":
             try:
-                r = requests.get("http://127.0.0.1:5001/kill_all")
-                update.message.reply_text("Все боты остановлены.")
+                r = requests.get("http://127.0.0.1:5001/toggle_reconnect")
+                update.message.reply_text(f"Реконнект: {r.text}")
             except Exception as e:
-                update.message.reply_text(f"Исключение: {e}")
+                update.message.reply_text(f"Ошибка: {e}")
 
         else:
-            # Если пришло какое-то неизвестное сообщение
-            update.message.reply_text(
-                "Не понял, что вы хотите. Нажмите на кнопку внизу или /start"
-            )
+            update.message.reply_text("Не понял команду. Нажмите /start.")
 
     dp.add_handler(MessageHandler(Filters.text, msg_handler))
 
-    # Запуск
     updater.start_polling()
-    # НЕ делаем updater.idle() в фоновом потоке
-    print(">>> Telegram-бот запущен (команда /start покажет клавиатуру).")
-
-
 
 #############################
 # Основная точка входа
@@ -1356,10 +1374,8 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     license_valid = False
 
-    # 1️⃣ Загружаем сохранённую лицензию
     expiry_date = load_license()
 
-    # 2️⃣ Проверяем подписку
     if expiry_date:
         now = datetime.datetime.now()
         if expiry_date > now:
