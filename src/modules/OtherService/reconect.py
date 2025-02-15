@@ -1,10 +1,12 @@
-# refactored_script.py
 import json
 import time
 import pyautogui
 import os
+from datetime import datetime
+import pytz
 
 SETTINGS_PATH = '../../../settings.json'  # Путь к файлу настроек
+
 
 def load_settings(path=SETTINGS_PATH):
     if not os.path.exists(path):
@@ -17,9 +19,11 @@ def load_settings(path=SETTINGS_PATH):
             print("Ошибка: Некорректный формат settings.json. Создаю новый.")
             return {}
 
+
 def save_settings(path, settings):
     with open(path, 'w', encoding='utf-8') as file:
         json.dump(settings, file, indent=4, ensure_ascii=False)
+
 
 def find_and_click(image_name, offset_x=0, offset_y=0, confidence=0.8):
     image_path = os.path.join('../../../resources/images/ImgReconect', image_name)
@@ -35,7 +39,24 @@ def find_and_click(image_name, offset_x=0, offset_y=0, confidence=0.8):
             print(f"Не удалось найти {image_name}, пробую снова...")
         time.sleep(1)
 
-def run_script(settings):
+
+def wait_for_correct_time():
+    # Получаем текущее время в московской зоне
+    moscow_tz = pytz.timezone('Europe/Moscow')
+    while True:
+        current_time = datetime.now(moscow_tz).strftime('%H:%M')
+        if current_time == '07:10':
+            print("Время 7:10 утра! Начинаю выполнение скрипта.")
+            break
+        else:
+            print(f"Текущее время: {current_time}. Ожидаю 7:10 утра...")
+        time.sleep(60)  # Проверяем время каждую минуту
+
+
+def run_script(settings, wait_until_710=False):
+    if wait_until_710:
+        wait_for_correct_time()  # Ждем, пока не наступит 7:10 утра
+
     # Предполагается, что settings содержит ключи:
     # "password" – строка пароля,
     # "character" – "First", "Second" или "Third",
@@ -101,7 +122,20 @@ def run_script(settings):
     else:
         print("Ошибка: Картинка 3 не найдена")
 
+
 if __name__ == "__main__":
     settings = load_settings()
-    # Для запуска скрипта можно вызвать run_script(settings)
-    run_script(settings)
+
+    # Спрашиваем пользователя, какой способ запуска он выбирает
+    choice = input(
+        "Какой способ запуска вам нужен? Введите '1' для немедленного запуска или '2' для ожидания 7:10 утра: ")
+
+    if choice == '2':
+        wait_until_710 = True
+        print("Ожидаю 7:10 утра...")
+    else:
+        wait_until_710 = False
+        print("Скрипт начнется немедленно.")
+
+    # Запускаем скрипт с выбранным способом запуска
+    run_script(settings, wait_until_710)
