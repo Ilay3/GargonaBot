@@ -150,6 +150,41 @@ def save_license(key, expiry_date):
     except Exception as e:
         print(f"❌ Ошибка при сохранении лицензии: {e}")
 
+def send_screenshot_to_telegram(screenshot_path):
+    """
+    Загружает настройки из settings.json, отправляет скриншот в Telegram (через sendPhoto)
+    и возвращает True, если отправка успешна.
+    """
+    # Определяем корневую папку проекта
+    settings_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "settings.json"))
+    print(f"Using settings path: {settings_path}")
+    try:
+        with open(settings_path, "r", encoding="utf-8") as f:
+            settings = json.load(f)
+    except Exception as e:
+        print(f"Ошибка загрузки настроек из {settings_path}: {e}")
+        return False
+
+    token = settings.get("telegram_token", "")
+    chat_id = settings.get("telegram_chat_id", "")
+    if not token or not chat_id:
+        print("telegram_token или telegram_chat_id не заданы в настройках.")
+        return False
+
+    url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    try:
+        with open(screenshot_path, "rb") as photo:
+            response = requests.post(url, data={"chat_id": chat_id}, files={"photo": photo})
+        if response.status_code == 200:
+            print("Скриншот успешно отправлен в Telegram.")
+            return True
+        else:
+            print(f"Ошибка отправки скриншота: {response.text}")
+            return False
+    except Exception as e:
+        print(f"Исключение при отправке скриншота: {e}")
+        return False
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -1214,6 +1249,42 @@ class MainWindow(QMainWindow):
             msgBox.setText("Пожалуйста, переключите раскладку клавиатуры на английскую, наш бот работает только с ней!")
             msgBox.exec()
 
+    from pathlib import Path
+
+    def send_stats(self):
+        """
+        Метод для отправки статистики:
+         - Запускает скрипт screenshotstats.py (который делает скриншот),
+         - Находит созданный файл,
+         - Отправляет его в Telegram,
+         - При успешной отправке удаляет файл.
+        """
+        from pathlib import Path
+
+        # Путь к скрипту screenshotstats.py (предполагается, что он находится в modules/OtherService/)
+        screenshotstats_path = os.path.join(MODULES_BASE, "OtherService", "screenshotstats.py")
+        if not os.path.exists(screenshotstats_path):
+            print("Файл screenshotstats.py не найден.")
+            return
+
+        # Запускаем скрипт и ждём его завершения (блокирующий вызов)
+        subprocess.run([PYTHON_EXEC, screenshotstats_path])
+
+        # Папка, куда скрипт сохраняет скриншоты
+        screenshot_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../resources/screenshots"))
+        files = list(Path(screenshot_dir).glob("screenshot_*.png"))
+        if not files:
+            print("Скриншот не найден после выполнения скрипта.")
+            return
+
+        screenshot_file = max(files, key=lambda p: p.stat().st_mtime)
+        if send_screenshot_to_telegram(str(screenshot_file)):
+            os.remove(str(screenshot_file))
+            print("Скриншот отправлен и удалён.")
+        else:
+            print("Ошибка отправки скриншота.")
+
+
     def kill_all_bots(self):
         for key in self.processes:
             proc = self.processes[key]
@@ -1251,10 +1322,11 @@ def run_telegram_bot():
         return
     updater = Updater(token, use_context=True)
     dp = updater.dispatcher
+
     def cmd_start(update: Update, context: CallbackContext):
         keyboard = [
             [KeyboardButton("🎯 Anti-AFK"), KeyboardButton("🎡 Авто-колесо"), KeyboardButton("🎟 Лотерея")],
-            [KeyboardButton("♻️ Реконнект")],
+            [KeyboardButton("♻️ Реконнект"), KeyboardButton("📊 Статистика")],
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
         text = (
@@ -1265,9 +1337,12 @@ def run_telegram_bot():
             "• Авто-колесо — провернуть колесо удачи\n"
             "• Лотерея — запустить/остановить лотерею\n"
             "• Реконнект — перезапустить игру при вылете\n"
+            "• Статистика — сделать скриншот статистики и отправить его в Telegram\n"
         )
         update.message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+
     dp.add_handler(CommandHandler("start", cmd_start))
+
     def msg_handler(update: Update, context: CallbackContext):
         global window
         text = update.message.text
@@ -1290,13 +1365,16 @@ def run_telegram_bot():
                 window.toggle_lottery(False)
                 update.message.reply_text("🎟 <b>Лотерея</b> остановлена.", parse_mode=ParseMode.HTML)
         elif text == "♻️ Реконнект":
-            window.toggle_reconnect(not window.processes.get("reconnect") is None)
-            if window.processes["reconnect"] is None:
-                update.message.reply_text("♻️ <b>Реконнект</b> остановлен.", parse_mode=ParseMode.HTML)
+            if window.manual_reconnect():
+                update.message.reply_text("♻️ <b>Реконнект</b> запущен немедленно.", parse_mode=ParseMode.HTML)
             else:
-                update.message.reply_text("♻️ <b>Реконнект</b> запущен.", parse_mode=ParseMode.HTML)
+                update.message.reply_text("♻️ <b>Реконнект</b>: произошла ошибка.", parse_mode=ParseMode.HTML)
+        elif text == "📊 Статистика":
+            window.send_stats()
+            update.message.reply_text("📊 <b>Статистика</b> отправлена.", parse_mode=ParseMode.HTML)
         else:
             update.message.reply_text("Неизвестная команда. Нажмите /start, чтобы открыть меню.", parse_mode=ParseMode.HTML)
+
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, msg_handler))
     updater.start_polling()
 

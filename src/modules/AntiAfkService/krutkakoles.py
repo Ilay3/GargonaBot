@@ -5,6 +5,10 @@ import time
 import os
 import logging
 from datetime import datetime
+import subprocess
+import json
+
+import requests
 
 # Настройка логирования
 logging.basicConfig(
@@ -23,23 +27,19 @@ templates = {
 }
 logging.info("Эталонные изображения загружены.")
 
-
 def get_timestamp():
     """Возвращает текущую дату и время в формате YYYY-MM-DD_HH-MM-SS"""
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     logging.debug(f"Получен временной штамп: {ts}")
     return ts
 
-
 def find_template_on_screen(template, threshold=0.9):
     """Ищет шаблон на экране, возвращает координаты центра найденного объекта."""
     screenshot = pyautogui.screenshot()
     screenshot = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
     gray_screen = cv2.cvtColor(screenshot, cv2.COLOR_BGR2GRAY)
-
     res = cv2.matchTemplate(gray_screen, template, cv2.TM_CCOEFF_NORMED)
     loc = np.where(res >= threshold)
-
     if len(loc[0]) > 0:
         y, x = loc[0][0], loc[1][0]  # Берем первые найденные координаты
         center = (x + template.shape[1] // 2, y + template.shape[0] // 2)
@@ -48,12 +48,47 @@ def find_template_on_screen(template, threshold=0.9):
     logging.debug("Шаблон не найден.")
     return None
 
+def send_screenshot_to_telegram(screenshot_path):
+    """
+    Загружает настройки из settings.json, отправляет скриншот в Telegram (через sendPhoto)
+    и возвращает True, если отправка успешна.
+    """
+    # Определяем корневую папку проекта
+    settings_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "settings.json"))
+
+    print(f"Using settings path: {settings_path}")
+    try:
+        with open(settings_path, "r", encoding="utf-8") as f:
+            settings = json.load(f)
+    except Exception as e:
+        print(f"Ошибка загрузки настроек из {settings_path}: {e}")
+        return False
+
+    token = settings.get("telegram_token", "")
+    chat_id = settings.get("telegram_chat_id", "")
+    if not token or not chat_id:
+        print("telegram_token или telegram_chat_id не заданы в настройках.")
+        return False
+
+    url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    try:
+        with open(screenshot_path, "rb") as photo:
+            response = requests.post(url, data={"chat_id": chat_id}, files={"photo": photo})
+        if response.status_code == 200:
+            print("Скриншот успешно отправлен в Telegram.")
+            return True
+        else:
+            print(f"Ошибка отправки скриншота: {response.text}")
+            return False
+    except Exception as e:
+        print(f"Исключение при отправке скриншота: {e}")
+        return False
 
 while True:
+    # Первый цикл поиска: ищем шаблон DostupKoleso
     while True:
         time.sleep(1)
         pos1 = find_template_on_screen(templates["DostupKoleso"])
-
         if pos1:
             logging.info("Найден DostupKoleso.")
             time.sleep(60)
@@ -65,11 +100,11 @@ while True:
             logging.debug("DostupKoleso не найден, продолжаем поиск...")
             print("Первая картинка не найдена, продолжаем поиск...")
 
+    # Второй цикл: ищем IconCasino и InterfaceKolesa по очереди
     for step in ["IconCasino", "InterfaceKolesa"]:
         while True:
             time.sleep(1)
             pos = find_template_on_screen(templates[step])
-
             if pos:
                 x, y = pos
                 pyautogui.moveTo(x, y, duration=0.2)
@@ -81,10 +116,10 @@ while True:
                 logging.debug(f"{step} не найден, продолжаем поиск...")
                 print(f"{step}.png не найден, продолжаем поиск...")
 
+    # Третий цикл: ищем ButtonKoloso и кликаем по нему
     while True:
         time.sleep(4)
         pos_button = find_template_on_screen(templates["ButtonKoloso"])
-
         if pos_button:
             x, y = pos_button
             pyautogui.moveTo(x, y, duration=0.2)
@@ -96,13 +131,21 @@ while True:
             logging.debug("ButtonKoloso не найден, продолжаем поиск...")
             print("ButtonKoloso не найден, продолжаем поиск...")
 
+    # Ждём 10 секунд, делаем финальный скриншот
     time.sleep(10)
     timestamp = get_timestamp()
-    os.makedirs("../../../resources/screenshots", exist_ok=True)
-
-    screenshot_path = f"../../../resources/screenshots/{timestamp}_final_screenshot.png"
+    screenshot_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "resources", "screenshots"))
+    os.makedirs(screenshot_dir, exist_ok=True)
+    screenshot_path = os.path.join(screenshot_dir, f"{timestamp}_final_screenshot.png")
     pyautogui.screenshot(screenshot_path)
     logging.info(f"Финальный скриншот сохранён по пути: {screenshot_path}")
+
+    # Отправляем скриншот в Telegram и, если успешно, удаляем файл
+    if send_screenshot_to_telegram(screenshot_path):
+        os.remove(screenshot_path)
+        logging.info("Скриншот удалён с ПК после отправки.")
+    else:
+        logging.error("Скриншот не отправлен, файл оставлен.")
 
     time.sleep(20)
     pyautogui.press('esc')
@@ -110,8 +153,6 @@ while True:
     time.sleep(1)
     pyautogui.press('esc')
     logging.info("Нажата клавиша ESC повторно")
-
     pyautogui.press('backspace')
     logging.info("Нажата клавиша Backspace")
-
     # Возвращаемся к началу цикла поиска первой картинки
