@@ -3,7 +3,7 @@ import requests
 from telegram.ext import Updater, CommandHandler
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ParseMode
 
-import ctypes
+import ctypes, time
 import os
 import subprocess
 import datetime
@@ -21,14 +21,7 @@ from PySide6.QtWidgets import (
     QDialog, QSizePolicy, QMessageBox, QComboBox
 )
 
-def resource_path(relative_path):
-    """Возвращает абсолютный путь к ресурсу.
-    При запуске из EXE использует sys._MEIPASS, иначе – текущую директорию."""
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
+
 
 
 SERVER_URL = "http://83.220.165.162:5000"
@@ -1296,10 +1289,11 @@ class MainWindow(QMainWindow):
     def send_stats(self):
         """
         Метод для отправки статистики:
-         - Запускает скрипт screenshotstats.py (который делает скриншот),
-         - Находит созданный файл,
-         - Отправляет его в Telegram,
-         - При успешной отправке удаляет файл.
+          - Запускает скрипт screenshotstats.py (который делает скриншот),
+          - Ждёт пару секунд,
+          - Ищет созданный файл,
+          - Отправляет его в Telegram,
+          - При успешной отправке удаляет файл.
         """
         from pathlib import Path
 
@@ -1312,9 +1306,18 @@ class MainWindow(QMainWindow):
         # Запускаем скрипт и ждём его завершения (блокирующий вызов)
         subprocess.run([PYTHON_EXEC, screenshotstats_path])
 
+        # Добавляем задержку, чтобы убедиться, что файл записался
+        time.sleep(2)
+
         # Папка, куда скрипт сохраняет скриншоты
-        screenshot_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../resources/screenshots"))
-        files = list(Path(screenshot_dir).glob("screenshot_*.png"))
+        screenshot_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "resources", "screenshots"))
+        from pathlib import Path
+        screenshot_dir = Path(screenshot_dir)
+        files = list(screenshot_dir.glob("screenshot_*.png"))
+
+        # Для отладки выведите список найденных файлов
+        print("Найденные файлы:", files)
+
         if not files:
             print("Скриншот не найден после выполнения скрипта.")
             return
