@@ -1,9 +1,11 @@
 import sys
+
+
 import requests
 from telegram.ext import Updater, CommandHandler
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ParseMode
 
-import ctypes
+import ctypes, time
 import os
 import subprocess
 import datetime
@@ -22,13 +24,25 @@ from PySide6.QtWidgets import (
 )
 
 def resource_path(relative_path):
-    """Возвращает абсолютный путь к ресурсу.
-    При запуске из EXE использует sys._MEIPASS, иначе – текущую директорию."""
+    """
+    Возвращает абсолютный путь к файлу.
+    При сборке с PyInstaller файлы распаковываются во временную папку, путь к которой хранится в sys._MEIPASS.
+    """
     try:
         base_path = sys._MEIPASS
     except Exception:
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
+
+# Используем resource_path для определения MODULES_BASE:
+MODULES_BASE = resource_path("modules")
+if not os.path.isdir(MODULES_BASE):
+    raise FileNotFoundError(f"Не найдена папка modules по пути: {MODULES_BASE}")
+
+# Добавляем путь к модулю ProcessChecker
+process_checker_path = os.path.join(MODULES_BASE, "ProcessChecker")
+sys.path.append(process_checker_path)
+import process_checker
 
 
 SERVER_URL = "http://83.220.165.162:5000"
@@ -64,17 +78,6 @@ def save_settings(settings):
     with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
         json.dump(settings, f, indent=4)
     print("Настройки сохранены.")
-
-MODULES_BASE = None
-if os.path.isdir(os.path.join(BASE_DIR, "modules")):
-    MODULES_BASE = os.path.join(BASE_DIR, "modules")
-elif os.path.isdir(os.path.join(BASE_DIR, "src", "modules")):
-    MODULES_BASE = os.path.join(BASE_DIR, "src", "modules")
-else:
-    raise FileNotFoundError("Не найдена папка modules")
-
-sys.path.append(os.path.join(MODULES_BASE, "ProcessChecker"))
-import process_checker
 
 # Пути к скриптам
 ANTIAFK_PATH     = os.path.join(MODULES_BASE, "AntiAfkService", "antiafk.py")
@@ -1296,10 +1299,11 @@ class MainWindow(QMainWindow):
     def send_stats(self):
         """
         Метод для отправки статистики:
-         - Запускает скрипт screenshotstats.py (который делает скриншот),
-         - Находит созданный файл,
-         - Отправляет его в Telegram,
-         - При успешной отправке удаляет файл.
+          - Запускает скрипт screenshotstats.py (который делает скриншот),
+          - Ждёт пару секунд,
+          - Ищет созданный файл,
+          - Отправляет его в Telegram,
+          - При успешной отправке удаляет файл.
         """
         from pathlib import Path
 
@@ -1312,9 +1316,18 @@ class MainWindow(QMainWindow):
         # Запускаем скрипт и ждём его завершения (блокирующий вызов)
         subprocess.run([PYTHON_EXEC, screenshotstats_path])
 
+        # Добавляем задержку, чтобы убедиться, что файл записался
+        time.sleep(2)
+
         # Папка, куда скрипт сохраняет скриншоты
-        screenshot_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../resources/screenshots"))
-        files = list(Path(screenshot_dir).glob("screenshot_*.png"))
+        screenshot_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "resources", "screenshots"))
+        from pathlib import Path
+        screenshot_dir = Path(screenshot_dir)
+        files = list(screenshot_dir.glob("screenshot_*.png"))
+
+        # Для отладки выведите список найденных файлов
+        print("Найденные файлы:", files)
+
         if not files:
             print("Скриншот не найден после выполнения скрипта.")
             return
@@ -1325,7 +1338,6 @@ class MainWindow(QMainWindow):
             print("Скриншот отправлен и удалён.")
         else:
             print("Ошибка отправки скриншота.")
-
 
     def kill_all_bots(self):
         for key in self.processes:
