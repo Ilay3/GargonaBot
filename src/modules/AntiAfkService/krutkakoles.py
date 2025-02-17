@@ -6,6 +6,10 @@ import os
 import logging
 from datetime import datetime
 
+import requests
+
+from src.main import send_screenshot_to_telegram
+
 # Настройка логирования
 logging.basicConfig(
     filename='../../../logs/koleso.txt',
@@ -29,7 +33,6 @@ def get_timestamp():
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     logging.debug(f"Получен временной штамп: {ts}")
     return ts
-
 
 def find_template_on_screen(template, threshold=0.9):
     """Ищет шаблон на экране, возвращает координаты центра найденного объекта."""
@@ -98,11 +101,18 @@ while True:
 
     time.sleep(10)
     timestamp = get_timestamp()
-    os.makedirs("../../../resources/screenshots", exist_ok=True)
-
-    screenshot_path = f"../../../resources/screenshots/{timestamp}_final_screenshot.png"
+    screenshot_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../resources/screenshots"))
+    os.makedirs(screenshot_dir, exist_ok=True)
+    screenshot_path = os.path.join(screenshot_dir, f"{timestamp}_final_screenshot.png")
     pyautogui.screenshot(screenshot_path)
     logging.info(f"Финальный скриншот сохранён по пути: {screenshot_path}")
+
+    # Отправляем скриншот в Telegram и, если успешно, удаляем файл
+    if send_screenshot_to_telegram(screenshot_path):
+        os.remove(screenshot_path)
+        logging.info("Скриншот удалён с ПК после отправки.")
+    else:
+        logging.error("Скриншот не отправлен, файл оставлен.")
 
     time.sleep(20)
     pyautogui.press('esc')

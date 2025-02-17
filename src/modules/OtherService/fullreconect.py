@@ -46,7 +46,7 @@ def check_settings(path):
     return settings
 
 def find_and_click(image_name, offset_x=0, offset_y=0, confidence=0.8, double_click=False):
-    image_path = os.path.join('../../../resources/images/ImgReconect', image_name)
+    image_path = os.path.join('../../../resources/images/ImgFullReconect', image_name)
     while True:
         try:
             location = pyautogui.locateCenterOnScreen(image_path, confidence=confidence)
@@ -90,7 +90,7 @@ def main(settings_path):
     time.sleep(1)
     # Запускаем конкурентный поиск изображений (image2.png или image21.png)
     while True:
-        if find_and_click('image2.png') or find_and_click('image21.png'):
+        if find_and_click('image21.png'):
             break
         time.sleep(1)
 
