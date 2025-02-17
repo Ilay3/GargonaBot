@@ -3,6 +3,7 @@ import numpy as np
 import pyautogui
 import time
 
+pyautogui.FAILSAFE = False
 
 # Загружаем эталонные изображения
 templates = {

@@ -6,6 +6,8 @@ import os
 from datetime import datetime, timedelta
 import pytz
 
+
+pyautogui.FAILSAFE = False
 # Часовой пояс Москвы
 moscow_tz = pytz.timezone('Europe/Moscow')
 

@@ -5,6 +5,8 @@ import time
 from datetime import datetime
 import keyboard
 
+
+pyautogui.FAILSAFE = False
 # Загружаем эталонное изображение в градациях серого
 template = cv2.imread('../../../resources/images/ImgPort/ButtonE.png', 0)
 

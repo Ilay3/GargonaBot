@@ -6,6 +6,7 @@ import os
 import logging
 from datetime import datetime
 
+pyautogui.FAILSAFE = False
 # Настройка логирования
 logging.basicConfig(
     filename='../../../logs/koleso.txt',
@@ -96,7 +97,7 @@ while True:
             logging.debug("ButtonKoloso не найден, продолжаем поиск...")
             print("ButtonKoloso не найден, продолжаем поиск...")
 
-    time.sleep(10)
+    time.sleep(20)
     timestamp = get_timestamp()
     os.makedirs("../../../resources/screenshots", exist_ok=True)
 

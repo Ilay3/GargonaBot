@@ -3,6 +3,8 @@ import numpy as np
 import pyautogui
 import time
 
+pyautogui.FAILSAFE = False
+
 # Загружаем эталонное изображение кнопки F
 F_TEMPLATE = cv2.imread("../../../resources/images/ImgKosyaki/F.png", 0)
 

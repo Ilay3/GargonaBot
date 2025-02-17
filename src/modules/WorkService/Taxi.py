@@ -3,6 +3,8 @@ import numpy as np
 import pyautogui
 import time
 
+
+pyautogui.FAILSAFE = False
 # Загружаем эталонные изображения
 TEMPLATES = [
     cv2.imread("../../../resources/images/ImgTaxi/KPK.png", 0),  # Первая картинка

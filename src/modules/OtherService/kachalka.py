@@ -4,6 +4,8 @@ import keyboard  # Быстрее, чем pyautogui
 import time
 import mss
 
+
+
 # Путь к изображениям и соответствующие кнопки
 image_key_map = {
     '../../../resources/images/ImgKachalka/Circle1.png': 'space',

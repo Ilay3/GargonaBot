@@ -4,6 +4,8 @@ import numpy as np
 import time
 import os
 
+
+pyautogui.FAILSAFE = False
 # Путь к изображению для поиска
 image_path = os.path.join('../../../resources/images/ImgTochilka/palka.png')
 

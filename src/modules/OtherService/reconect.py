@@ -5,6 +5,8 @@ import os
 from datetime import datetime
 import pytz
 
+
+pyautogui.FAILSAFE = False
 SETTINGS_PATH = '../../../settings.json'  # Путь к файлу настроек
 
 

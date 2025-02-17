@@ -3,7 +3,7 @@ import pyautogui
 import os
 import keyboard  # Библиотека для отслеживания нажатий клавиш
 
-
+pyautogui.FAILSAFE = False
 # Функция для поиска изображения на экране
 def find_image(image_name, confidence):
     image_path = os.path.join('../../../resources/images/ImgShveiaDemorgan', image_name)

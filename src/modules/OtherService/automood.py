@@ -5,6 +5,8 @@ import time
 import os
 import json
 
+
+pyautogui.FAILSAFE = False
 # Определяем базовый каталог – где находится этот файл
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parts = current_dir.split(os.sep)

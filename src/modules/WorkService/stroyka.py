@@ -4,6 +4,9 @@ import pyautogui
 import time
 import os
 
+
+pyautogui.FAILSAFE = False
+
 # Загружаем эталонные изображения
 templates = {
     "ButtonE": cv2.imread('../../../resources/images/ImgStroyka/ButtonE.png', 0),
@@ -38,6 +41,6 @@ while True:
             while find_template_on_screen(template):
                 pyautogui.press(key_mapping[key])
                 print(f"Обнаружено {key}.png, нажата клавиша {key_mapping[key]}")
-                time.sleep(1/32)  # Нажатие каждую секунду
+                time.sleep(1/64)  # Нажатие каждую секунду
 
     time.sleep(1)
