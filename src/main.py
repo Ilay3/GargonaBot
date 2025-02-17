@@ -21,6 +21,16 @@ from PySide6.QtWidgets import (
     QDialog, QSizePolicy, QMessageBox, QComboBox
 )
 
+def resource_path(relative_path):
+    """Возвращает абсолютный путь к ресурсу.
+    При запуске из EXE использует sys._MEIPASS, иначе – текущую директорию."""
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+
 SERVER_URL = "http://83.220.165.162:5000"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if os.path.isdir(os.path.join(BASE_DIR, "src")):
@@ -729,6 +739,38 @@ class MainWindow(QMainWindow):
             )
         else:
             self.work_hint_label.setText("Ошибка: введите корректные клавиши")
+
+    def manual_reconnect(self):
+        """
+        Метод для ручного реконнекта игры.
+        Если процесс реконнекта уже запущен, завершает его.
+        Затем запускает процесс реконнекта, вызывая скрипт reconect.py и передавая путь к settings.json.
+        Возвращает True, если процесс успешно запущен, иначе – False.
+        """
+        # Если процесс реконнекта уже существует, завершаем его
+        if self.processes.get("reconnect") is not None:
+            try:
+                proc = self.processes["reconnect"]
+                proc.terminate()
+                proc.wait()
+                self.processes["reconnect"] = None
+                print("Предыдущий процесс реконнекта остановлен.")
+            except Exception as e:
+                print("Ошибка при остановке предыдущего реконнекта:", e)
+        try:
+            # Формируем путь к settings.json (предполагается, что он находится в корне проекта)
+            settings_path = os.path.join(PROJECT_ROOT, "settings.json")
+            # Запускаем скрипт reconect.py (путь должен быть указан в переменной RECONNECT_PATH)
+            proc = subprocess.Popen(
+                [PYTHON_EXEC, RECONNECT_PATH, settings_path],
+                cwd=os.path.dirname(RECONNECT_PATH)
+            )
+            self.processes["reconnect"] = proc
+            print("Manual Reconnect запущен, PID:", proc.pid)
+            return True
+        except Exception as e:
+            print("Ошибка при запуске Manual Reconnect:", e)
+            return False
 
     def toggle_kosyaki(self):
         if self.processes.get("kosyaki") is None:
