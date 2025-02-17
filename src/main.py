@@ -2,7 +2,7 @@ import sys
 import requests
 from telegram.ext import Updater, CommandHandler
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ParseMode
-
+from tkinter import messagebox
 import ctypes
 import os
 import subprocess
@@ -1102,6 +1102,8 @@ class MainWindow(QMainWindow):
             self.inactive_counter += 1
             if self.inactive_counter >= 180 and not self.bots_killed_due_to_inactivity:
                 print("Игра не активна 3 минуты. Останавливаем всех ботов.")
+                messagebox.showwarning("Внимание!",
+                                       "Игра была неактивна в течении 3х минут, если вы хотите продолжать пользоваться ботами перезапустите его в лаунчере!")
                 self.kill_all_bots()
                 self.bots_killed_due_to_inactivity = True
 
