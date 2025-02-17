@@ -51,41 +51,6 @@ def find_template_on_screen(template, threshold=0.9):
     logging.debug("Шаблон не найден.")
     return None
 
-def send_screenshot_to_telegram(screenshot_path):
-    """
-    Загружает настройки из settings.json, отправляет скриншот в Telegram (через sendPhoto)
-    и возвращает True, если отправка успешна.
-    """
-    # Определяем корневую папку проекта
-    settings_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "settings.json"))
-
-    print(f"Using settings path: {settings_path}")
-    try:
-        with open(settings_path, "r", encoding="utf-8") as f:
-            settings = json.load(f)
-    except Exception as e:
-        print(f"Ошибка загрузки настроек из {settings_path}: {e}")
-        return False
-
-    token = settings.get("telegram_token", "")
-    chat_id = settings.get("telegram_chat_id", "")
-    if not token or not chat_id:
-        print("telegram_token или telegram_chat_id не заданы в настройках.")
-        return False
-
-    url = f"https://api.telegram.org/bot{token}/sendPhoto"
-    try:
-        with open(screenshot_path, "rb") as photo:
-            response = requests.post(url, data={"chat_id": chat_id}, files={"photo": photo})
-        if response.status_code == 200:
-            print("Скриншот успешно отправлен в Telegram.")
-            return True
-        else:
-            print(f"Ошибка отправки скриншота: {response.text}")
-            return False
-    except Exception as e:
-        print(f"Исключение при отправке скриншота: {e}")
-        return False
 
 while True:
     # Первый цикл поиска: ищем шаблон DostupKoleso
