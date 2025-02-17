@@ -5,6 +5,8 @@ import keyboard
 import os
 import json
 
+
+
 # Определяем текущую папку (где лежит этот файл)
 base_dir = os.path.dirname(os.path.abspath(__file__))
 # Если скрипт находится в src/modules/OtherService, то PROJECT_ROOT – это три уровня вверх

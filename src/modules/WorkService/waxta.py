@@ -3,6 +3,8 @@ import numpy as np
 import pyautogui
 import time
 
+
+pyautogui.FAILSAFE = False
 # Загружаем единственное эталонное изображение
 template = cv2.imread('../../../resources/images/ImgWaxta/ButtonE.png', 0)
 

@@ -4,6 +4,7 @@ import pyautogui
 import time
 import logging
 
+pyautogui.FAILSAFE = False
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 

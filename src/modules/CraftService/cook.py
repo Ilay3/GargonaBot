@@ -6,6 +6,8 @@ import pyautogui
 import time
 import keyboard
 
+pyautogui.FAILSAFE = False
+
 # Определяем каталог, где находится данный файл (cook.py)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Предполагаем, что resources находится в project_root/resources

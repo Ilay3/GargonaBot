@@ -5,6 +5,8 @@ import time
 import threading
 from datetime import datetime
 
+pyautogui.FAILSAFE = False
+
 # Загружаем эталонные изображения в градациях серого
 template_first = cv2.imread('../../../resources/images/ImgSchems/Rabota.png', 0)
 template_second = cv2.imread('../../../resources/images/ImgSchems/StopButton.png', 0)
