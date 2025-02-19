@@ -8,22 +8,32 @@ import keyboard
 
 pyautogui.FAILSAFE = False
 
-# Определяем каталог, где находится данный файл (cook.py)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Предполагаем, что resources находится в project_root/resources
-RESOURCES_DIR = os.path.join(BASE_DIR, "..", "..", "..", "resources")
+RESOURCES_DIR = os.path.join(BASE_DIR, "..", "..", "..", "resources", "images", "ImgCook")
 
-# Формируем абсолютные пути к изображениям
-templates = {
-    "Vegetables": cv2.imread(os.path.join(RESOURCES_DIR, "images", "ImgCook", "Vegetables.png"), 0),
-    "Knife": cv2.imread(os.path.join(RESOURCES_DIR, "images", "ImgCook", "Knife.png"), 0),
-    "StartCook": cv2.imread(os.path.join(RESOURCES_DIR, "images", "ImgCook", "StartCook.png"), 0),
+# Список блюд и их изображения
+menu = {
+    "Салат": ["Vegetables.png", "Knife.png", "StartCook.png"],
+    "Смузи": ["Vegetables.png", "Water.png", "Venchik.png", "StartCook.png"],
+    "Рагу": ["Meat.png", "Water.png","Vegetables.png","Fire.png", "StartCook.png"]
 }
+
+# Выбор блюда
+print("Выберите блюдо:")
+for i, dish in enumerate(menu.keys(), start=1):
+    print(f"{i}. {dish}")
+
+dish_choice = int(input("Введите номер блюда: ")) - 1
+selected_dish = list(menu.keys())[dish_choice]
+
+templates = {name: cv2.imread(os.path.join(RESOURCES_DIR, name), 0) for name in menu[selected_dish]}
 
 move_positions = {
-    "Vegetables": (684, 289),
-    "Knife": (811, 298),
+    "Vegetables.png": (684, 289), "Knife.png": (811, 298),  "StartCook.png": (812, 671),
+    "Vegetables.png": (684, 289), "Water.png": (811, 298), "Venchik.png":(930, 299),  "StartCook.png": (812, 671),
+    "Vegetables.png": (684, 289), "Water.png": (811, 298),"Meat.png": (930, 299), "Fire.png": (672, 419),  "StartCook.png": (812, 671),
 }
+
 
 def find_template_on_screen(template, threshold=0.9):
     screenshot = pyautogui.screenshot()
@@ -36,38 +46,16 @@ def find_template_on_screen(template, threshold=0.9):
         return x + template.shape[1] // 2, y + template.shape[0] // 2
     return None
 
-# Если передан аргумент, используем его, иначе запрашиваем ввод у пользователя.
-if len(sys.argv) > 1:
-    try:
-        num_dishes = int(sys.argv[1])
-    except ValueError:
-        print("Неверное значение количества блюд.")
-        sys.exit(1)
-else:
-    num_dishes = int(input("Сколько блюд нужно приготовить? "))
+
+num_dishes = int(input("Сколько блюд нужно приготовить? "))
 
 for i in range(num_dishes):
     if keyboard.is_pressed('0'):
         print("Остановка программы.")
         break
-    print(f"Начинаем готовить {i + 1}-е блюдо...")
-    # Поиск Vegetables
-    while not keyboard.is_pressed('0'):
-        time.sleep(1)
-        pos1 = find_template_on_screen(templates["Vegetables"])
-        if pos1:
-            x, y = pos1
-            if "Vegetables" in move_positions:
-                new_x, new_y = move_positions["Vegetables"]
-                pyautogui.moveTo(x, y, duration=0.5)
-                pyautogui.dragTo(new_x, new_y, duration=0.5)
-                print(f"Перемещено Vegetables.png в {new_x}, {new_y}")
-            time.sleep(2)
-            break
-        else:
-            print("Vegetables.png не найден, продолжаем поиск...")
-    # Поиск шагов "Knife" и "StartCook"
-    for step in ["Knife", "StartCook"]:
+    print(f"Начинаем готовить {i + 1}-е блюдо ({selected_dish})...")
+
+    for step in menu[selected_dish]:
         while not keyboard.is_pressed('0'):
             time.sleep(1)
             pos = find_template_on_screen(templates[step])
@@ -77,12 +65,12 @@ for i in range(num_dishes):
                     new_x, new_y = move_positions[step]
                     pyautogui.moveTo(x, y, duration=0.5)
                     pyautogui.dragTo(new_x, new_y, duration=0.5)
-                    print(f"Перемещено {step}.png в {new_x}, {new_y}")
+                    print(f"Перемещено {step} в {new_x}, {new_y}")
                 pyautogui.click(x, y)
-                print(f"Клик по {step}.png в координатах: {x}, {y}")
+                print(f"Клик по {step} в координатах: {x}, {y}")
                 break
             else:
-                print(f"{step}.png не найден, продолжаем поиск...")
+                print(f"{step} не найден, продолжаем поиск...")
     time.sleep(8)
 
 print("Все блюда приготовлены!")
