@@ -12,7 +12,7 @@ import threading
 import time
 
 
-from src.resources import get_image_path
+
 
 PYTHON_EXEC = sys.executable
 
@@ -29,23 +29,22 @@ def run_service_mode():
                 sys.exit(0)
             elif service_name == "waxta":
                 from modules.WorkService.waxta import run_waxta
-                image_path = get_image_path("ImgWaxta", "ButtonE.png")
-                print("Путь к изображению для waxta:", image_path)
-                run_waxta(image_path)
+
+
+                run_waxta()
                 sys.exit(0)
             elif service_name == "port":
                 from modules.WorkService.port import run_port
-                image_path = get_image_path("ImgPort", "ButtonE.png")
-                print("Путь к изображению для port:", image_path)
-                run_port(image_path)
+
+                run_port()
                 sys.exit(0)
+
     sys.exit(0)
 
 # Если передан флаг сервисного режима – запускаем его и выходим
+
 if any(arg.startswith("--service=") for arg in sys.argv[1:]):
     run_service_mode()
-
-
 from telegram import Update, ParseMode, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import CommandHandler, CallbackContext, MessageHandler, Filters, Updater
 
@@ -57,26 +56,6 @@ from PySide6.QtWidgets import (
     QDialog, QSizePolicy, QMessageBox, QComboBox
 )
 
-def resource_path(relative_path):
-    """
-    Возвращает абсолютный путь к файлу.
-    При сборке с PyInstaller файлы распаковываются во временную папку, путь к которой хранится в sys._MEIPASS.
-    """
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
-
-# Используем resource_path для определения MODULES_BASE:
-MODULES_BASE = resource_path("modules")
-if not os.path.isdir(MODULES_BASE):
-    raise FileNotFoundError(f"Не найдена папка modules по пути: {MODULES_BASE}")
-
-# Добавляем путь к модулю ProcessChecker
-process_checker_path = os.path.join(MODULES_BASE, "ProcessChecker")
-sys.path.append(process_checker_path)
-import process_checker
 
 
 SERVER_URL = "http://83.220.165.162:5000"
@@ -113,28 +92,39 @@ def save_settings(settings):
         json.dump(settings, f, indent=4)
     print("Настройки сохранены.")
 
+MODULES_BASE = None
+if os.path.isdir(os.path.join(BASE_DIR, "modules")):
+    MODULES_BASE = os.path.join(BASE_DIR, "modules")
+elif os.path.isdir(os.path.join(BASE_DIR, "src", "modules")):
+    MODULES_BASE = os.path.join(BASE_DIR, "src", "modules")
+else:
+    raise FileNotFoundError("Не найдена папка modules")
+
+sys.path.append(os.path.join(MODULES_BASE, "ProcessChecker"))
+import process_checker
+
 # Пути к скриптам
-ANTIAFK_PATH     = resource_path(os.path.join("modules", "AntiAfkService", "antiafk.py"))
-KRUTKAKOLES_PATH = resource_path(os.path.join("modules", "AntiAfkService", "krutkakoles.py"))
-LOTTERY_PATH     = resource_path(os.path.join("modules", "AntiAfkService", "lottery.py"))
-COOK_PATH        = resource_path(os.path.join("modules", "CraftService", "cook.py"))
-WAXTA_PATH       = resource_path(os.path.join("modules", "WorkService", "waxta.py"))
-PORT_PATH        = resource_path(os.path.join("modules", "WorkService", "port.py"))
-STROYKA_PATH     = resource_path(os.path.join("modules", "WorkService", "stroyka.py"))
-KOZLODOY_PATH    = resource_path(os.path.join("modules", "WorkService", "kozlodoy.py"))
-AUTORUN_PATH     = resource_path(os.path.join("modules", "OtherService", "autorun.py"))
-AUTOMOOD_PATH    = resource_path(os.path.join("modules", "OtherService", "automood.py"))
-AUTOEAT_PATH     = resource_path(os.path.join("modules", "OtherService", "autoeat.py"))
-KACHALKA_PATH    = resource_path(os.path.join("modules", "OtherService", "kachalka.py"))
-KOSYAKI_PATH     = resource_path(os.path.join("modules", "CraftService", "kosyaki.py"))
-TAXI_PATH        = resource_path(os.path.join("modules", "WorkService", "Taxi.py"))
-FIREMAN_PATH     = resource_path(os.path.join("modules", "WorkService", "fireman.py"))
-SHVEIKA_PATH     = resource_path(os.path.join("modules", "MiniGamesService", "Shveika.py"))
-SKOLZKAYA_PATH   = resource_path(os.path.join("modules", "MiniGamesService", "Skolzkaya.py"))
-SCHEMS_PATH      = resource_path(os.path.join("modules", "MiniGamesService", "Schems.py"))
-RECONNECT_PATH   = resource_path(os.path.join("modules", "OtherService", "reconect.py"))
-DEMORGAN_PATH    = resource_path(os.path.join("modules", "TuragaService", "ShveiaDemorgan.py"))
-TOCHILKA_PATH    = resource_path(os.path.join("modules", "TuragaService", "Tochilka.py"))
+ANTIAFK_PATH     = os.path.join(MODULES_BASE, "AntiAfkService", "antiafk.py")
+KRUTKAKOLES_PATH = os.path.join(MODULES_BASE, "AntiAfkService", "krutkakoles.py")
+LOTTERY_PATH     = os.path.join(MODULES_BASE, "AntiAfkService", "lottery.py")
+COOK_PATH        = os.path.join(MODULES_BASE, "CraftService", "cook.py")
+WAXTA_PATH       = os.path.join(MODULES_BASE, "WorkService", "waxta.py")
+PORT_PATH        = os.path.join(MODULES_BASE, "WorkService", "port.py")
+STROYKA_PATH     = os.path.join(MODULES_BASE, "WorkService", "stroyka.py")
+KOZLODOY_PATH    = os.path.join(MODULES_BASE, "WorkService", "kozlodoy.py")
+AUTORUN_PATH     = os.path.join(MODULES_BASE, "OtherService", "autorun.py")
+AUTOMOOD_PATH    = os.path.join(MODULES_BASE, "OtherService", "automood.py")
+AUTOEAT_PATH     = os.path.join(MODULES_BASE, "OtherService", "autoeat.py")
+KACHALKA_PATH    = os.path.join(MODULES_BASE, "OtherService", "kachalka.py")
+KOSYAKI_PATH     = os.path.join(MODULES_BASE, "CraftService", "kosyaki.py")
+TAXI_PATH        = os.path.join(MODULES_BASE, "WorkService", "Taxi.py")
+FIREMAN_PATH     = os.path.join(MODULES_BASE, "WorkService", "fireman.py")
+SHVEIKA_PATH     = os.path.join(MODULES_BASE, "MiniGamesService", "Shveika.py")
+SKOLZKAYA_PATH   = os.path.join(MODULES_BASE, "MiniGamesService", "Skolzkaya.py")
+SCHEMS_PATH      = os.path.join(MODULES_BASE, "MiniGamesService", "Schems.py")
+RECONNECT_PATH   = os.path.join(MODULES_BASE, "OtherService", "reconect.py")
+DEMORGAN_PATH    = os.path.join(MODULES_BASE, "TuragaService", "ShveiaDemorgan.py")
+TOCHILKA_PATH    = os.path.join(MODULES_BASE, "TuragaService", "Tochilka.py")
 
 PYTHON_EXEC = sys.executable
 
@@ -231,10 +221,6 @@ def send_screenshot_to_telegram(screenshot_path):
     except Exception as e:
         print(f"Исключение при отправке скриншота: {e}")
         return False
-
-
-
-
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -888,8 +874,7 @@ class MainWindow(QMainWindow):
                 proc = subprocess.Popen([PYTHON_EXEC, AUTOEAT_PATH], cwd=wd)
                 self.processes["autoeat"] = proc
                 self.autoeat_launch_button.setText("Остановить Авто-Еда")
-                self.autoeat_launch_button.setStyleSheet(
-                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                self.autoeat_launch_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
                 print("Autoeat запущен, PID:", proc.pid)
             except Exception as e:
                 print("Ошибка при запуске Autoeat:", e)
@@ -906,14 +891,9 @@ class MainWindow(QMainWindow):
 
     def toggle_antiafk(self):
         if self.processes["antiafk"] is None:
-            self.processes["antiafk"] = subprocess.Popen(
-                [PYTHON_EXEC, sys.argv[0], "--service=antiafk"],
-                creationflags=subprocess.CREATE_NO_WINDOW
-            )
+            self.processes["antiafk"] = subprocess.Popen([PYTHON_EXEC, ANTIAFK_PATH], cwd=PROJECT_ROOT)
             self.antiafk_button.setText("Остановить Anti-AFK")
-            self.antiafk_button.setStyleSheet(
-                "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
-            )
+            self.antiafk_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
         else:
             self.processes["antiafk"].terminate()
             self.processes["antiafk"].wait()
@@ -979,41 +959,53 @@ class MainWindow(QMainWindow):
 
     def toggle_waxta(self):
         if self.processes["waxta"] is None:
-            # Получаем путь к текущему исполняемому файлу (main.py)
-            exe_path = os.path.abspath(__file__)
-            # Рабочая директория должна быть каталогом src
-            working_dir = os.path.dirname(exe_path)
-            print("Запуск waxta, exe_path:", exe_path, "working_dir:", working_dir)
-            # Запускаем main.py с аргументом --service=waxta.
-            self.processes["waxta"] = subprocess.Popen(
-                [PYTHON_EXEC, exe_path, "--service=waxta"],
-                cwd=working_dir,
-                creationflags=subprocess.CREATE_NO_WINDOW
-            )
-            self.waxta_button.setText("Остановить waxta")
-            print("waxta запущен, PID:", self.processes["waxta"].pid)
+            exe_path = sys.argv[0]  # Убедитесь, что путь правильный
+            try:
+                self.processes["waxta"] = subprocess.Popen(
+                    [exe_path, "--service=waxta"],
+                    creationflags=subprocess.CREATE_NO_WINDOW  # Без окна
+                )
+                self.waxta_button.setText("Остановить работу на Шахте")
+                self.waxta_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                print("Waxta запущена, PID:", self.processes["waxta"].pid)
+            except Exception as e:
+                print("Ошибка при запуске Шахты:", e)
         else:
-            self.processes["waxta"].terminate()
-            self.processes["waxta"].wait()
-            self.processes["waxta"] = None
-            self.waxta_button.setText("Запустить waxta")
-            print("waxta остановлен")
+            try:
+                self.processes["waxta"].terminate()
+                self.processes["waxta"].wait()
+                self.processes["waxta"] = None
+                self.waxta_button.setText("Запустить работу на Шахте")
+                self.waxta_button.setStyleSheet("font-size: 16px; padding: 10px;")
+                print("Шахта остановлена.")
+            except Exception as e:
+                print("Ошибка при остановке Шахты:", e)
 
     def toggle_port(self):
         if self.processes["port"] is None:
-            exe_path = os.path.abspath(sys.argv[0])
-            self.processes["port"] = subprocess.Popen(
-                [PYTHON_EXEC, sys.argv[0], "--service=port"],
-                creationflags=subprocess.CREATE_NO_WINDOW
-            )
-            self.port_button.setText("Остановить работу в Порту")
-            self.port_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+            exe_path = sys.argv[0]  # Убедитесь, что путь правильный
+            try:
+                self.processes["port"] = subprocess.Popen(
+                    [exe_path, "--service=port"],
+                    creationflags=subprocess.CREATE_NO_WINDOW  # Без окна
+                )
+                self.port_button.setText("Остановить работу в Порту")
+                self.port_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                print("Port запущена, PID:", self.processes["port"].pid)
+            except Exception as e:
+                print("Ошибка при запуске Шахты:", e)
         else:
-            self.processes["port"].terminate()
-            self.processes["port"].wait()
-            self.processes["port"] = None
-            self.port_button.setText("Запустить работу в Порту")
-            self.port_button.setStyleSheet("font-size: 16px; padding: 10px;")
+            try:
+                self.processes["port"].terminate()
+                self.processes["port"].wait()
+                self.processes["port"] = None
+                self.port_button.setText("Запустить работу в Порту")
+                self.port_button.setStyleSheet("font-size: 16px; padding: 10px;")
+                print("Порт остановлена.")
+            except Exception as e:
+                print("Ошибка при остановке работы в Порту", e)
 
     def toggle_stroyka(self):
         if self.processes["stroyka"] is None:
@@ -1376,6 +1368,7 @@ class MainWindow(QMainWindow):
             print("Скриншот отправлен и удалён.")
         else:
             print("Ошибка отправки скриншота.")
+
 
     def kill_all_bots(self):
         for key in self.processes:

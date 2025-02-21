@@ -3,18 +3,24 @@ import numpy as np
 import pyautogui
 import time
 import sys
+import os
 
 
-def template_matching_service(image_path, key_to_press='e', threshold=0.9, check_interval=1 / 32):
+def run_waxta(image_path="../../../resources/images/ImgWaxta/ButtonE.png", key_to_press='e', threshold=0.9, check_interval=1 / 32):
     """
     Запускает сервисный процесс поиска шаблона на экране и нажатия клавиши при обнаружении.
 
-    :param image_path: Путь к эталонному изображению.
+    :param image_path: Путь к эталонному изображению (по умолчанию берётся стандартный).
     :param key_to_press: Клавиша, которую нужно нажимать при обнаружении.
     :param threshold: Порог совпадения шаблона.
     :param check_interval: Интервал проверки экрана.
     """
     pyautogui.FAILSAFE = False
+
+    if image_path is None:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+
+
     template = cv2.imread(image_path, 0)
 
     if template is None:
@@ -30,7 +36,7 @@ def template_matching_service(image_path, key_to_press='e', threshold=0.9, check
         loc = np.where(res >= threshold)
         return len(loc[0]) > 0
 
-    print("Сервис запущен...")
+    print("Waxta сервис запущен...")
     while True:
         if find_template_on_screen():
             while find_template_on_screen():
@@ -42,6 +48,6 @@ def template_matching_service(image_path, key_to_press='e', threshold=0.9, check
 
 if __name__ == "__main__":
     if "--service" in sys.argv:
-        template_matching_service('../../../resources/images/ImgWaxta/ButtonE.png')
+        run_waxta()
     else:
         print("Флаг --service не передан, выход из программы.")
