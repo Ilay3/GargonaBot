@@ -11,6 +11,7 @@ import hashlib
 import threading
 import time
 
+
 from src.resources import get_image_path
 
 PYTHON_EXEC = sys.executable
