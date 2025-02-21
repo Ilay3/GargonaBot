@@ -1,4 +1,26 @@
 import sys
+
+# Проверяем, есть ли аргумент --service=antiafk
+if any(arg.startswith("--service=") for arg in sys.argv[1:]):
+    service_name = next(arg.split("=")[1] for arg in sys.argv[1:] if arg.startswith("--service="))
+
+    if service_name == "antiafk":
+        from modules.AntiAfkService.antiafk import run_background
+
+        run_background()
+    else:
+        print(f"Неизвестный сервис: {service_name}")
+
+    sys.exit(0)
+
+# Обычный запуск GUI
+from PySide6.QtWidgets import QApplication, QMainWindow
+
+app = QApplication(sys.argv)
+window = QMainWindow()
+window.show()
+app.exec()
+
 import requests
 from telegram.ext import Updater, CommandHandler
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ParseMode
@@ -925,13 +947,16 @@ class MainWindow(QMainWindow):
 
     def toggle_waxta(self):
         if self.processes["waxta"] is None:
-            wd = os.path.dirname(WAXTA_PATH)
+            exe_path = sys.argv[0]  # Убедитесь, что путь правильный
             try:
-                proc = subprocess.Popen([PYTHON_EXEC, WAXTA_PATH], cwd=wd)
-                self.processes["waxta"] = proc
+                self.processes["waxta"] = subprocess.Popen(
+                    [exe_path, "--service=waxta"],
+                    creationflags=subprocess.CREATE_NO_WINDOW  # Без окна
+                )
                 self.waxta_button.setText("Остановить работу на Шахте")
-                self.waxta_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
-                print("Waxta запущена, PID:", proc.pid)
+                self.waxta_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                print("Waxta запущена, PID:", self.processes["waxta"].pid)
             except Exception as e:
                 print("Ошибка при запуске Шахты:", e)
         else:
