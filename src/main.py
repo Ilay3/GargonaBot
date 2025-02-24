@@ -14,6 +14,7 @@ import time
 
 
 
+
 PYTHON_EXEC = sys.executable
 
 def run_service_mode():
@@ -959,10 +960,13 @@ class MainWindow(QMainWindow):
 
     def toggle_waxta(self):
         if self.processes["waxta"] is None:
-            exe_path = sys.argv[0]  # Убедитесь, что путь правильный
+            # Получаем путь к текущему интерпретатору Python
+            python_executable = sys.executable
+            # Получаем путь к текущему скрипту
+            script_path = sys.argv[0]
             try:
                 self.processes["waxta"] = subprocess.Popen(
-                    [exe_path, "--service=waxta"],
+                    [python_executable, script_path, "--service=waxta"],
                     creationflags=subprocess.CREATE_NO_WINDOW  # Без окна
                 )
                 self.waxta_button.setText("Остановить работу на Шахте")

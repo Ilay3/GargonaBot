@@ -6,7 +6,7 @@ import sys
 import os
 
 
-def run_waxta(image_path="../../../resources/images/ImgWaxta/ButtonE.png", key_to_press='e', threshold=0.9, check_interval=1 / 32):
+def run_waxta(image_path=None, key_to_press='e', threshold=0.9, check_interval=1 / 32):
     """
     Запускает сервисный процесс поиска шаблона на экране и нажатия клавиши при обнаружении.
 
@@ -19,7 +19,7 @@ def run_waxta(image_path="../../../resources/images/ImgWaxta/ButtonE.png", key_t
 
     if image_path is None:
         script_dir = os.path.dirname(os.path.abspath(__file__))
-
+        image_path = os.path.join(script_dir, "../../../resources/images/ImgWaxta/ButtonE.png")
 
     template = cv2.imread(image_path, 0)
 
