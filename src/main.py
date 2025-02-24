@@ -988,18 +988,21 @@ class MainWindow(QMainWindow):
 
     def toggle_port(self):
         if self.processes["port"] is None:
-            exe_path = sys.argv[0]  # Убедитесь, что путь правильный
+            # Получаем путь к текущему интерпретатору Python
+            python_executable = sys.executable
+            # Получаем путь к текущему скрипту
+            script_path = sys.argv[0]
             try:
                 self.processes["port"] = subprocess.Popen(
-                    [exe_path, "--service=port"],
+                    [python_executable, script_path, "--service=port"],
                     creationflags=subprocess.CREATE_NO_WINDOW  # Без окна
                 )
                 self.port_button.setText("Остановить работу в Порту")
                 self.port_button.setStyleSheet(
                     "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
-                print("Port запущена, PID:", self.processes["port"].pid)
+                print("Порт запущена, PID:", self.processes["port"].pid)
             except Exception as e:
-                print("Ошибка при запуске Шахты:", e)
+                print("Ошибка при запуске Порта:", e)
         else:
             try:
                 self.processes["port"].terminate()

@@ -3,40 +3,28 @@ import numpy as np
 import pyautogui
 import time
 import sys
-import os
 from datetime import datetime
 
 
-def run_port(image_path="../../../resources/images/ImgPort/ButtonE.png", threshold=0.9, check_interval=0.01):
+def run_port(
+    button_image_path="../../../resources/images/ImgPort/ButtonE.png",
+    second_image_path="../../../resources/images/ImgPort/SecondImage.png",
+    threshold=0.8,
+):
     """
-    Запускает сервисный процесс поиска шаблона на экране и нажатия клавиши 'E' при обнаружении.
+    Запускает процесс поиска шаблонов на экране:
+    1. Ищет первую картинку (ButtonE) и нажимает 'E' через 0.3 секунды после её обнаружения.
+    2. После нахождения первой картинки ищет вторую картинку.
+    3. Если вторая картинка найдена, цикл поиска ButtonE начинается заново.
 
-    :param image_path: Путь к эталонному изображению.
+    :param button_image_path: Путь к изображению кнопки ButtonE.
+    :param second_image_path: Путь ко второй картинке.
     :param threshold: Порог совпадения шаблона.
-    :param check_interval: Интервал проверки экрана.
     """
     pyautogui.FAILSAFE = False
 
     def log(message):
         print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}")
-
-    def get_pixel_color(x, y):
-        """Получает цвет пикселя по указанным координатам."""
-        return pyautogui.pixel(x, y)
-
-    def port():
-        """Проверяет пиксели и нажимает 'E' при соответствии условиям."""
-        while True:
-            right = get_pixel_color(963, 495)
-            left = get_pixel_color(956, 495)
-            mid = get_pixel_color(959, 495)
-
-            if right == (126, 211, 33) and left == (126, 211, 33):
-                pyautogui.press('e')
-            elif mid != (231, 33, 57):
-                pyautogui.press('e')
-
-            time.sleep(0.01)
 
     def find_template_on_screen(template):
         """Ищет шаблон на экране и возвращает True, если найдено совпадение."""
@@ -52,18 +40,40 @@ def run_port(image_path="../../../resources/images/ImgPort/ButtonE.png", thresho
             return True
         return False
 
-    template = cv2.imread(image_path, 0)
-    if template is None:
-        log(f"Ошибка: не удалось загрузить изображение {image_path}")
+    # Загрузка шаблонов изображений
+    button_template = cv2.imread(button_image_path, 0)
+    second_template = cv2.imread(second_image_path, 0)
+
+    if button_template is None:
+        log(f"Ошибка: не удалось загрузить изображение кнопки {button_image_path}")
+        return
+    if second_template is None:
+        log(f"Ошибка: не удалось загрузить второе изображение {second_image_path}")
         return
 
     log("Сервис запущен...")
     while True:
-        if find_template_on_screen(template):
-            log("Изображение найдено! Ожидание 0.50 секунды перед нажатием E...")
-            port()
-            log("Нажата клавиша E")
-        time.sleep(check_interval)
+        # Поиск первой картинки (ButtonE)
+        if find_template_on_screen(button_template):
+            log("ButtonE найдена! Ожидание 0.3 секунды перед нажатием E...")
+            time.sleep(0.7)  # Задержка 0.3 секунды
+            pyautogui.press('e')  # Нажатие клавиши E
+            log("Клавиша E нажата.")
+
+            # Поиск второй картинки после обработки ButtonE
+            log("Поиск второй картинки...")
+            second_image_found = False
+            while not second_image_found:
+                if find_template_on_screen(second_template):
+                    log("Вторая картинка найдена! Цикл поиска ButtonE начнётся заново.")
+                    second_image_found = True
+                time.sleep(0.1)  # Интервал проверки для второй картинки
+
+            # После нахождения второй картинки цикл начинается заново
+            continue
+
+        # Интервал проверки, если ButtonE не найдена
+        time.sleep(0.1)
 
 
 if __name__ == "__main__":
