@@ -44,6 +44,11 @@ def run_service_mode():
 
                 run_stroyka()
                 sys.exit(0)
+            elif service_name == "kozlodoy":
+                from modules.WorkService.kozlodoy import run_kozlodoy
+
+                run_kozlodoy()
+                sys.exit(0)
     sys.exit(0)
 
 # Если передан флаг сервисного режима – запускаем его и выходим
@@ -1047,13 +1052,19 @@ class MainWindow(QMainWindow):
 
     def toggle_kozlodoy(self):
         if self.processes["kozlodoy"] is None:
-            wd = os.path.dirname(KOZLODOY_PATH)
+            # Получаем путь к текущему интерпретатору Python
+            python_executable = sys.executable
+            # Получаем путь к текущему скрипту
+            script_path = sys.argv[0]
             try:
-                proc = subprocess.Popen([PYTHON_EXEC, KOZLODOY_PATH], cwd=wd)
-                self.processes["kozlodoy"] = proc
+                self.processes["kozlodoy"] = subprocess.Popen(
+                    [python_executable, script_path, "--service=kozlodoy"],
+                    creationflags=subprocess.CREATE_NO_WINDOW  # Без окна
+                )
                 self.kozlodoy_button.setText("Остановить работу на Ферме")
-                self.kozlodoy_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
-                print("Работа на Ферме запущена, PID:", proc.pid)
+                self.kozlodoy_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                print("Работа на Ферме запущена, PID:", self.processes["kozlodoy"].pid)
             except Exception as e:
                 print("Ошибка при запуске работы на Ферме:", e)
         else:
