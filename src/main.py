@@ -39,7 +39,11 @@ def run_service_mode():
 
                 run_port()
                 sys.exit(0)
+            elif service_name == "stroyka":
+                from modules.WorkService.stroyka import run_stroyka
 
+                run_stroyka()
+                sys.exit(0)
     sys.exit(0)
 
 # Если передан флаг сервисного режима – запускаем его и выходим
@@ -1016,13 +1020,18 @@ class MainWindow(QMainWindow):
 
     def toggle_stroyka(self):
         if self.processes["stroyka"] is None:
-            wd = os.path.dirname(STROYKA_PATH)
+            # Получаем путь к текущему интерпретатору Python
+            python_executable = sys.executable
+            # Получаем путь к текущему скрипту
+            script_path = sys.argv[0]
             try:
-                proc = subprocess.Popen([PYTHON_EXEC, STROYKA_PATH], cwd=wd)
-                self.processes["stroyka"] = proc
+                self.processes["stroyka"] = subprocess.Popen(
+                    [python_executable, script_path, "--service=stroyka"],
+                    creationflags=subprocess.CREATE_NO_WINDOW  # Без окна
+                )
                 self.stroyka_button.setText("Остановить работу на Стройке")
                 self.stroyka_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
-                print("Стройка запущена, PID:", proc.pid)
+                print("Стройка запущена, PID:", self.processes["stroyka"].pid)
             except Exception as e:
                 print("Ошибка при запуске Стройки:", e)
         else:
