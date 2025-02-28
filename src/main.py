@@ -49,6 +49,21 @@ def run_service_mode():
 
                 run_kozlodoy()
                 sys.exit(0)
+            elif service_name == "autoeat":
+                from modules.OtherService.autoeat import run_autoeat
+
+                run_autoeat()
+                sys.exit(0)
+            elif service_name == "automood":
+                from modules.OtherService.automood import run_automood
+
+                run_automood()
+                sys.exit(0)
+            elif service_name == "autorun":
+                from modules.OtherService.autorun import run_autorun
+
+                run_autorun()
+                sys.exit(0)
     sys.exit(0)
 
 # Если передан флаг сервисного режима – запускаем его и выходим
@@ -832,14 +847,20 @@ class MainWindow(QMainWindow):
                 print("Ошибка при остановке kosyaki:", e)
 
     def toggle_automood(self):
-        if self.processes.get("automood") is None:
-            wd = os.path.dirname(AUTOMOOD_PATH)
+        if self.processes["automood"] is None:
+            # Получаем путь к текущему интерпретатору Python
+            python_executable = sys.executable
+            # Получаем путь к текущему скрипту
+            script_path = sys.argv[0]
             try:
-                proc = subprocess.Popen([PYTHON_EXEC, AUTOMOOD_PATH], cwd=wd)
-                self.processes["automood"] = proc
+                self.processes["automood"] = subprocess.Popen(
+                    [python_executable, script_path, "--service=automood"],
+                    creationflags=subprocess.CREATE_NO_WINDOW  # Без окна
+                )
                 self.automood_launch_button.setText("Остановить Авто-Настроение")
-                self.automood_launch_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
-                print("Automood запущен, PID:", proc.pid)
+                self.automood_launch_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                print("Automood запущен, PID:", self.processes["automood"].pid)
             except Exception as e:
                 print("Ошибка при запуске Automood:", e)
         else:
@@ -854,15 +875,21 @@ class MainWindow(QMainWindow):
                 print("Ошибка при остановке Automood:", e)
 
     def toggle_autorun(self):
-        if self.processes.get("autorun") is None:
-            wd = os.path.dirname(AUTORUN_PATH)
+        if self.processes["autorun"] is None:
+            # Получаем путь к текущему интерпретатору Python
+            python_executable = sys.executable
+            # Получаем путь к текущему скрипту
+            script_path = sys.argv[0]
             try:
-                proc = subprocess.Popen([PYTHON_EXEC, AUTORUN_PATH], cwd=wd)
-                self.processes["autorun"] = proc
+                self.processes["autorun"] = subprocess.Popen(
+                    [python_executable, script_path, "--service=autorun"],
+                    creationflags=subprocess.CREATE_NO_WINDOW  # Без окна
+                )
                 self.autorun_launch_button.setText("Остановить Авто-Бег")
-                self.autorun_launch_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                self.autorun_launch_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
                 self.chk_autorun.setChecked(True)
-                print("Autorun запущен, PID:", proc.pid)
+                print("Autorun запущен, PID:", self.processes["autorun"].pid)
             except Exception as e:
                 print("Ошибка при запуске Autorun:", e)
         else:
@@ -878,14 +905,20 @@ class MainWindow(QMainWindow):
                 print("Ошибка при остановке Autorun:", e)
 
     def toggle_autoeat(self):
-        if self.processes.get("autoeat") is None:
-            wd = os.path.dirname(AUTOEAT_PATH)
+        if self.processes["autoeat"] is None:
+            # Получаем путь к текущему интерпретатору Python
+            python_executable = sys.executable
+            # Получаем путь к текущему скрипту
+            script_path = sys.argv[0]
             try:
-                proc = subprocess.Popen([PYTHON_EXEC, AUTOEAT_PATH], cwd=wd)
-                self.processes["autoeat"] = proc
+                self.processes["autoeat"] = subprocess.Popen(
+                    [python_executable, script_path, "--service=autoeat"],
+                    creationflags=subprocess.CREATE_NO_WINDOW  # Без окна
+                )
                 self.autoeat_launch_button.setText("Остановить Авто-Еда")
-                self.autoeat_launch_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
-                print("Autoeat запущен, PID:", proc.pid)
+                self.autoeat_launch_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                print("Autoeat запущен, PID:", self.processes["autoeat"].pid)
             except Exception as e:
                 print("Ошибка при запуске Autoeat:", e)
         else:
