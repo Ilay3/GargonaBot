@@ -1,0 +1,2 @@
+pyinstaller --windowed --onefile --uac-admin --clean --hidden-import=psutil --hidden-import=win32gui --hidden-import=win32process --add-data "license.dat;." --add-data "settings.json;
+." --add-data "logs;logs" --add-data "resources;resources" --add-data "src\\modules;modules" src/main.py

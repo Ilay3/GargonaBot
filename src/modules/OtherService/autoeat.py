@@ -7,9 +7,19 @@ import os
 import json
 from datetime import datetime
 
+def get_resource_path(relative_path):
+    """Возвращает абсолютный путь к ресурсу, работает для dev и для PyInstaller."""
+    if hasattr(sys, '_MEIPASS'):
+        # Если запущено из .exe, используем временную папку
+        base_path = sys._MEIPASS
+    else:
+        # Если запущено из скрипта, используем текущую директорию
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
 def run_autoeat(
-    template_path="../../../resources/images/ImgEat/golod.png",
-    settings_file="settings.json",
+    template_path=get_resource_path(os.path.join("resources", "images", "ImgEat", "golod.png")),
+    settings_file=get_resource_path("settings.json"),
     threshold=0.9,
 ):
     print("Функция run_autoeat запущена.")
@@ -26,6 +36,8 @@ def run_autoeat(
     pyautogui.FAILSAFE = False
 
     def log(message):
+        with open("autoeat.log", "a") as f:
+            f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}\n")
         print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}")
 
     def load_settings():
@@ -45,21 +57,25 @@ def run_autoeat(
         gray_screen = cv2.cvtColor(screenshot, cv2.COLOR_BGR2GRAY)
 
         res = cv2.matchTemplate(gray_screen, template, cv2.TM_CCOEFF_NORMED)
-        loc = np.where(res >= threshold)
+        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+        log(f"Максимальное значение совпадения: {max_val}")
 
-        if len(loc[0]) > 0:
-            log(f"Совпадение найдено! Координаты: {list(zip(loc[1], loc[0]))}")
+        if max_val >= threshold:
+            log(f"Совпадение найдено! Координаты: {max_loc}")
             return True
         return False
 
-    # Преобразование относительных путей в абсолютные
-    script_dir = os.path.dirname(os.path.abspath(__file__))  # Директория скрипта
-    template_path = os.path.abspath(os.path.join(script_dir, template_path))
-    settings_file = os.path.abspath(os.path.join(script_dir, settings_file))
-
     # Логирование путей
-    log(f"Путь к шаблону: {template_path}")
-    log(f"Путь к файлу настроек: {settings_file}")
+    log(f"Абсолютный путь к шаблону: {template_path}")
+    log(f"Абсолютный путь к файлу настроек: {settings_file}")
+
+    # Проверка существования файлов
+    if not os.path.exists(template_path):
+        log(f"Ошибка: файл шаблона не найден: {template_path}")
+        return
+    if not os.path.exists(settings_file):
+        log(f"Ошибка: файл настроек не найден: {settings_file}")
+        return
 
     # Загрузка шаблона изображения
     template = cv2.imread(template_path, 0)
@@ -76,16 +92,16 @@ def run_autoeat(
 
     log("Сервис запущен...")
     while True:
-        # Поиск шаблона на экране
+        log("Поиск шаблона на экране...")
         if find_template_on_screen(template):
             log("Шаблон обнаружен. Начинаем нажатия клавиши...")
             while find_template_on_screen(template):
-                pyautogui.press(autoeat_key)  # Используем клавишу из настроек
+                pyautogui.press(autoeat_key)
                 log(f"Обнаружен недостаток еды, нажата клавиша '{autoeat_key}'")
-                time.sleep(10)  # Задержка между нажатиями
+                time.sleep(10)
         else:
             log("Шаблон не обнаружен. Проверка через 15 секунд...")
-        time.sleep(15)  # Задержка между проверками
+        time.sleep(15)
 
 
 if __name__ == "__main__":
