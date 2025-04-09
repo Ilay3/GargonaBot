@@ -2,106 +2,107 @@ import cv2
 import numpy as np
 import pyautogui
 import time
-import threading
+import sys
+import os
 from datetime import datetime
 
 pyautogui.FAILSAFE = False
 
-# Загружаем эталонные изображения в градациях серого
-template_first = cv2.imread('../../../resources/images/ImgSchems/Rabota.png', 0)
-template_second = cv2.imread('../../../resources/images/ImgSchems/StopButton.png', 0)
-
-running = False  # Флаг активности schemas()
-stop_event = threading.Event()  # Флаг для остановки всей программы
-
-# Координаты области поиска второй картинки (X, Y, ширина, высота)
-search_region = (583, 986, 1390, 1060)  # Установи нужные координаты
+# Получаем абсолютный путь к директории скрипта
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def log(message):
-    """Выводит сообщение с текущим временем."""
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}")
+    """Логирование сообщений с временной меткой"""
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    print(f"[{timestamp}] {message}")
 
 
-def get_pixel_color(x, y):
-    return pyautogui.pixel(x, y)
+def load_image(image_name):
+    """Загрузка изображений из папки resources"""
+    resources_path = os.path.join(SCRIPT_DIR, "..", "..", "resources", "images", "ImgSchems", image_name)
+    image = cv2.imread(resources_path, 0)
+    if image is None:
+        log(f"ОШИБКА: Не удалось загрузить изображение {image_name} из {resources_path}")
+    return image
 
 
-def schemas():
-    """Функция работы схем, управляется флагом running."""
-    global running
-    running = True
-    while running and not stop_event.is_set():
-        right = get_pixel_color(963, 495)
-        left = get_pixel_color(956, 495)
-        mid = get_pixel_color(959, 495)
+def find_template(template, threshold=0.8, region=None):
+    """Поиск шаблона на экране"""
+    try:
+        screenshot = pyautogui.screenshot(region=region) if region else pyautogui.screenshot()
+        screenshot = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
+        gray_screen = cv2.cvtColor(screenshot, cv2.COLOR_BGR2GRAY)
+        res = cv2.matchTemplate(gray_screen, template, cv2.TM_CCOEFF_NORMED)
+        return np.any(res >= threshold)
+    except Exception as e:
+        log(f"Ошибка при поиске шаблона: {str(e)}")
+        return False
 
-        if right == (126, 211, 33) and left == (126, 211, 33):  # 0x7ed321 в RGB
+
+def pixel_check():
+    """Проверка цвета пикселей и нажатие клавиши E"""
+    try:
+        x, y = 959, 495  # Центральные координаты
+        right = pyautogui.pixel(963, 495)
+        left = pyautogui.pixel(956, 495)
+        mid = pyautogui.pixel(x, y)
+
+        if right == (126, 211, 33) and left == (126, 211, 33):
             pyautogui.press('e')
-        elif mid != (231, 33, 57):  # 0xe72139 в RGB
+        elif mid != (231, 33, 57):
             pyautogui.press('e')
+    except Exception as e:
+        log(f"Ошибка при проверке пикселей: {str(e)}")
 
-        time.sleep(0.01)  # Таймаут для снижения нагрузки на CPU
+
+def run_schemas():
+    """Основная логика работы сервиса схем"""
+    # Загрузка шаблонов
+    template_rabota = load_image("Rabota.png")
+    template_stop = load_image("StopButton.png")
+
+    # Проверка загрузки изображений
+    if template_rabota is None or template_stop is None:
+        log("Критическая ошибка: отсутствуют необходимые изображения")
+        sys.exit(1)
+
+    log("Сервис схем: Инициализация...")
+    search_region = (583, 986, 1390, 1060)  # Область поиска кнопок
+
+    try:
+        while True:
+            # Поиск кнопки "Работа"
+            if find_template(template_rabota, threshold=0.8):
+                log("Активация режима работы со схемами")
+                last_check = time.time()
+
+                while True:
+                    # Проверка пикселей и нажатие клавиш
+                    pixel_check()
+
+                    # Проверка кнопки "Стоп" каждые 100 мс
+                    if time.time() - last_check >= 0.1:
+                        if find_template(template_stop, 0.8, search_region):
+                            log("Обнаружена кнопка остановки")
+                            return
+                        last_check = time.time()
+
+                    time.sleep(0.01)  # Снижение нагрузки на CPU
+
+            time.sleep(0.5)  # Пауза между проверками
+
+    except KeyboardInterrupt:
+        log("Работа сервиса прервана пользователем")
+    except Exception as e:
+        log(f"Критическая ошибка: {str(e)}")
+        sys.exit(1)
 
 
-def find_template_on_screen(template, threshold=0.8, region=None):
-    """
-    Ищет шаблон на экране.
-    region: (x, y, width, height) – ограничение области поиска.
-    """
-    if region:
-        screenshot = pyautogui.screenshot(region=region)  # Снимок только заданной области
+if __name__ == "__main__":
+    if "--service" in sys.argv:
+        log("Запуск сервиса схем в сервисном режиме")
+        run_schemas()
+        log("Сервис схем завершил работу")
     else:
-        screenshot = pyautogui.screenshot()  # Полный экран
-
-    screenshot = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
-    gray_screen = cv2.cvtColor(screenshot, cv2.COLOR_BGR2GRAY)
-
-    res = cv2.matchTemplate(gray_screen, template, cv2.TM_CCOEFF_NORMED)
-    loc = np.where(res >= threshold)
-
-    if len(loc[0]) > 0:
-        log(f"Совпадение найдено! Координаты: {list(zip(loc[1], loc[0]))}")
-        return True
-    return False
-
-
-def search_first():
-    """Поток для поиска первой картинки (Rabota.png) на всём экране."""
-    global running
-    while not stop_event.is_set():
-        if find_template_on_screen(template_first):  # Ищем на всём экране
-            if not running:
-                log("Первая картинка найдена! Запускаем schemas()...")
-                running = True
-                threading.Thread(target=schemas, daemon=True).start()
-        time.sleep(0.1)
-
-
-def search_second():
-    """Поток для поиска второй картинки (StopButton.png) в заданной области."""
-    global running
-    while not stop_event.is_set():
-        if running and find_template_on_screen(template_second, region=search_region):  # Ищем только в области
-            log("Вторая картинка найдена! Останавливаем всю программу...")
-            running = False  # Останавливаем schemas()
-            stop_event.set()  # Останавливаем все потоки
-            return  # Выход из потока
-
-        time.sleep(0.1)
-
-
-# Запуск потоков
-threading.Thread(target=search_first, daemon=True).start()  # Поиск первой картинки на всём экране
-threading.Thread(target=search_second, daemon=True).start()  # Поиск второй картинки в области
-
-# Основной поток (ждёт завершения)
-try:
-    while not stop_event.is_set():
-        time.sleep(1)
-except KeyboardInterrupt:
-    stop_event.set()  # Останавливаем потоки при выходе
-    log("Программа завершена.")
-
-# Координаты области поиска второй картинки (X, Y, ширина, высота)
-search_region = (583, 986, 1390, 1060)  # Установи нужные координаты
+        log("Для запуска используйте флаг --service")

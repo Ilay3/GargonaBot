@@ -75,6 +75,21 @@ def run_service_mode():
                 sys.argv = ['main.py', '--service=cookbot', '--dish', 'Салат', '--quantity', '40']
                 run_cookbot()
                 sys.exit(0)
+            elif service_name == "kosyaki":
+                from modules.CraftService.kosyaki import run_kosyaki
+
+                run_kosyaki()
+                sys.exit(0)
+            elif service_name == "taxi":
+                from modules.WorkService.Taxi import run_taxi
+
+                run_taxi()
+                sys.exit(0)
+            elif service_name == "schems":
+                from modules.MiniGamesService.Schems import run_schemas
+
+                run_schemas()
+                sys.exit(0)
     sys.exit(0)
 
 # Если передан флаг сервисного режима – запускаем его и выходим
@@ -514,9 +529,8 @@ class MainWindow(QMainWindow):
         dish_layout.addWidget(dish_label)
         dish_layout.addWidget(self.dish_combo)
         layout.addLayout(dish_layout)
-        # Инициализация атрибутов
-        self.processes = {}
-        self.cookbot_running = False
+        # Удалить строку: self.processes = {}
+        self.cookbot_running = False  # Оставляем инициализацию флага
         self.cook_button = QPushButton("Запустить")
         self.cook_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.cook_button.clicked.connect(self.toggle_cook)
@@ -850,13 +864,18 @@ class MainWindow(QMainWindow):
 
     def toggle_kosyaki(self):
         if self.processes.get("kosyaki") is None:
-            wd = os.path.dirname(KOSYAKI_PATH)
+            # Получаем путь к текущему интерпретатору Python
+            python_executable = sys.executable
+            # Получаем путь к текущему скрипту
+            script_path = sys.argv[0]
             try:
-                proc = subprocess.Popen([PYTHON_EXEC, KOSYAKI_PATH], cwd=wd)
-                self.processes["kosyaki"] = proc
+                self.processes["kosyaki"] = subprocess.Popen(
+                    [python_executable, script_path, "--service=kosyaki"],
+                    creationflags=subprocess.CREATE_NO_WINDOW  # Без окна
+                )
                 self.kosyaki_button.setText("Остановить создание Косяков")
                 self.kosyaki_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
-                print("Скрипт kosyaki запущен, PID:", proc.pid)
+                print("Скрипт kosyaki запущен, PID:", self.processes["kosyaki"].pid)
             except Exception as e:
                 print("Ошибка при запуске kosyaki:", e)
         else:
@@ -1150,27 +1169,36 @@ class MainWindow(QMainWindow):
                 print("Ошибка при остановке работы на Ферме:", e)
 
     def toggle_taxi(self):
-        if self.processes.get("taxi") is None:
-            wd = os.path.dirname(TAXI_PATH)
+        if self.processes["taxi"] is None:
+
             try:
-                proc = subprocess.Popen([PYTHON_EXEC, TAXI_PATH], cwd=wd)
-                self.processes["taxi"] = proc
-                self.taxi_button.setText("Остановить работу Таксистом")
-                self.taxi_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
-                print("Taxi запущен, PID:", proc.pid)
+                if getattr(sys, 'frozen', False):
+                    command = [sys.executable, "--service=taxi"]
+                else:
+                    command = [sys.executable, sys.argv[0], "--service=taxi"]
+
+                self.processes["taxi"] = subprocess.Popen(
+                    command,
+                    stdout=open('taxi_log.txt', 'w'),  # Запись логов в файл
+                    stderr=subprocess.STDOUT,
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                )
+                self.taxi_button.setText("Остановить работу в такси")
+                self.taxi_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                print("Работа в такси запущена, PID:", self.processes["taxi"].pid)
             except Exception as e:
-                print("Ошибка при запуске Taxi:", e)
+                print("Ошибка при запуске работы в Такси:", e)
         else:
             try:
                 self.processes["taxi"].terminate()
                 self.processes["taxi"].wait()
                 self.processes["taxi"] = None
-                self.taxi_button.setText("Запустить работу Таксистом")
+                self.taxi_button.setText("Запустить работу в Такси")
                 self.taxi_button.setStyleSheet("font-size: 16px; padding: 10px;")
-                print("Taxi остановлен.")
+                print("Работа в Такси остановлена.")
             except Exception as e:
-                print("Ошибка при остановке Taxi:", e)
-
+                print("Ошибка при остановке работы в Такси:", e)
     def toggle_fireman(self):
         if self.processes.get("fireman") is None:
             wd = os.path.dirname(FIREMAN_PATH)
@@ -1267,13 +1295,18 @@ class MainWindow(QMainWindow):
 
     def toggle_schems(self):
         if self.processes.get("schems") is None:
-            wd = os.path.dirname(SCHEMS_PATH)
+            # Получаем путь к текущему интерпретатору Python
+            python_executable = sys.executable
+            # Получаем путь к текущему скрипту
+            script_path = sys.argv[0]
             try:
-                proc = subprocess.Popen([PYTHON_EXEC, SCHEMS_PATH], cwd=wd)
-                self.processes["schems"] = proc
+                self.processes["schems"] = subprocess.Popen(
+                    [python_executable, script_path, "--service=schems"],
+                    creationflags=subprocess.CREATE_NO_WINDOW  # Без окна
+                )
                 self.schems_button.setText("Остановить Схемы")
                 self.schems_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
-                print("schems запущен, PID:", proc.pid)
+                print("schems запущен, PID:", self.processes["schems"].pid)
             except Exception as e:
                 print("Ошибка при запуске schems:", e)
         else:
