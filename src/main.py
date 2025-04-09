@@ -95,6 +95,11 @@ def run_service_mode():
                 from modules.MiniGamesService.Shveika import run_shveika
                 run_shveika()
                 sys.exit(0)
+            elif service_name == "skolzkaya":
+                from modules.MiniGamesService.Skolzkaya import run_Skolzkaya
+
+                run_Skolzkaya()
+                sys.exit(0)
     sys.exit(0)
 
 # Если передан флаг сервисного режима – запускаем его и выходим
@@ -1287,13 +1292,16 @@ class MainWindow(QMainWindow):
 
     def toggle_skolzkaya(self):
         if self.processes.get("skolzkaya") is None:
-            wd = os.path.dirname(SKOLZKAYA_PATH)
+            python_executable = sys.executable
+            script_path = sys.argv[0]
             try:
-                proc = subprocess.Popen([PYTHON_EXEC, SKOLZKAYA_PATH], cwd=wd)
-                self.processes["skolzkaya"] = proc
+                self.processes["skolzkaya"] = subprocess.Popen(
+                    [python_executable, script_path, "--service=skolzkaya"],
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                )
                 self.skolzkaya_button.setText("Остановить Скользкая дорога")
                 self.skolzkaya_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
-                print("Skolzkaya запущен, PID:", proc.pid)
+                print("Skolzkaya запущен, PID:", self.processes["skolzkaya"].pid)
             except Exception as e:
                 print("Ошибка при запуске Skolzkaya:", e)
         else:
