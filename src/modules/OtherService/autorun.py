@@ -6,6 +6,7 @@ import os
 import json
 import sys
 from datetime import datetime
+import platform
 
 
 def run_autorun(
@@ -15,10 +16,7 @@ def run_autorun(
 ):
     """
     Запускает процесс эмуляции зажатия клавиш 'w' и 'shift' при нажатии заданной клавиши.
-
-    :param settings_file: Путь к файлу настроек.
-    :param autorun_key: Клавиша для активации/деактивации эмуляции.
-    :param log_file: Имя файла для логирования.
+    Учитывает возможные проблемы с окружением и библиотеками.
     """
     def log(message, level="info"):
         """Логирует сообщение с временной меткой."""
@@ -40,17 +38,22 @@ def run_autorun(
                 log(f"Ошибка загрузки настроек: {e}", level="error")
         return {}
 
+    # Проверяем ОС
+    current_os = platform.system()
+    if current_os != "Windows":
+        log(f"Ошибка: Скрипт поддерживает только Windows. Текущая ОС: {current_os}", level="error")
+        return
+
     # Определяем текущую папку (где лежит этот файл)
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    # Если скрипт находится в src/modules/OtherService, то PROJECT_ROOT – это три уровня вверх
     project_root = os.path.abspath(os.path.join(base_dir, "..", "..", ".."))
     log(f"Используется корневая папка проекта: {project_root}")
 
-    # Файл настроек находится в корневой папке проекта
+    # Файл настроек
     SETTINGS_FILE = os.path.join(project_root, settings_file)
     log(f"Используется файл настроек: {SETTINGS_FILE}")
 
-    # Загружаем настройки и получаем клавишу для авторун (если не задано – по умолчанию '+')
+    # Загружаем настройки
     settings = load_settings()
     autorun_key = settings.get("autorun_key", autorun_key)
     log(f"Используется клавиша авторун: '{autorun_key}'")
@@ -70,33 +73,46 @@ def run_autorun(
     log("Запуск программы для эмуляции зажатия клавиш (autorun).")
 
     # Флаги состояния
-    emulation_active = False   # Эмуляция клавиш не активна изначально
-    key_pressed_flag = False   # Флаг для debounce
+    emulation_active = False
+    key_pressed_flag = False
 
     # Главный цикл эмуляции
     try:
         while True:
-            # Если нажата заданная клавиша и она ещё не была зафиксирована
             if keyboard.is_pressed(autorun_key):
                 if not key_pressed_flag:
                     key_pressed_flag = True
-                    # Переключаем состояние эмуляции
                     emulation_active = not emulation_active
                     if emulation_active:
                         log("Эмуляция активирована: зажимаем 'w' и 'shift'.")
-                        pydirectinput.keyDown('w')
-                        pydirectinput.keyDown('shift')
+                        try:
+                            pydirectinput.keyDown('w')
+                            pydirectinput.keyDown('shift')
+                        except Exception as e:
+                            log(f"Ошибка эмуляции: {e}", level="error")
+                            emulation_active = False  # Сбрасываем флаг при ошибке
                     else:
                         log("Эмуляция деактивирована: отпускаем 'w' и 'shift'.")
-                        pydirectinput.keyUp('w')
-                        pydirectinput.keyUp('shift')
+                        try:
+                            pydirectinput.keyUp('w')
+                            pydirectinput.keyUp('shift')
+                        except Exception as e:
+                            log(f"Ошибка при отпускании клавиш: {e}", level="error")
             else:
-                key_pressed_flag = False  # Сбрасываем флаг, когда клавиша отпущена
+                key_pressed_flag = False
 
-            time.sleep(0.1)  # Небольшая задержка для стабильности работы
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        log("Программа остановлена пользователем.")
     except Exception as e:
-        log(f"Произошла ошибка: {e}", level="error")
+        log(f"Критическая ошибка: {e}", level="error")
     finally:
+        # Гарантированно отпускаем клавиши при завершении
+        try:
+            pydirectinput.keyUp('w')
+            pydirectinput.keyUp('shift')
+        except:
+            pass
         log("Завершение программы.")
 
 
