@@ -90,6 +90,11 @@ def run_service_mode():
 
                 run_schemas()
                 sys.exit(0)
+            elif service_name == "shveika":
+                print("main.py: Ветка service_name == 'shveika' активна")
+                from modules.MiniGamesService.Shveika import run_shveika
+                run_shveika()
+                sys.exit(0)
     sys.exit(0)
 
 # Если передан флаг сервисного режима – запускаем его и выходим
@@ -1251,13 +1256,22 @@ class MainWindow(QMainWindow):
 
     def toggle_shveika(self):
         if self.processes.get("shveika") is None:
-            wd = os.path.dirname(SHVEIKA_PATH)
+            python_executable = sys.executable
+            script_path = sys.argv[0]
+
+            print(f"[DEBUG] Путь к интерпретатору: {python_executable}")
+            print(f"[DEBUG] Путь к скрипту: {script_path}")
+            print(f"[DEBUG] Аргументы запуска: {[python_executable, script_path, '--service=shveika']}")
+
             try:
-                proc = subprocess.Popen([PYTHON_EXEC, SHVEIKA_PATH], cwd=wd)
-                self.processes["shveika"] = proc
+                self.processes["shveika"] = subprocess.Popen(
+                    [python_executable, script_path, "--service=shveika"],
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                )
                 self.shveika_button.setText("Остановить пошив Одежды")
-                self.shveika_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
-                print("Shveika запущен, PID:", proc.pid)
+                self.shveika_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                print("Shveika запущен, PID:", self.processes["shveika"].pid)
             except Exception as e:
                 print("Ошибка при запуске Shveika:", e)
         else:
