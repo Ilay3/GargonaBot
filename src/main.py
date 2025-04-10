@@ -10,7 +10,7 @@ import platform
 import hashlib
 import threading
 import time
-
+import numpy as np
 
 
 
@@ -45,9 +45,20 @@ def run_service_mode():
                 run_stroyka()
                 sys.exit(0)
             elif service_name == "kozlodoy":
-                from modules.WorkService.kozlodoy import run_kozlodoy
+                from modules.WorkService.kozlodoy import run_color_detection
+                zones_config = {
+                    "A": ([(843, 833), (843, 917), (929, 833), (929, 917)], "#0000ff"),
+                    "D": ([(992, 830), (992, 916), (1077, 830), (1077, 916)], "#0000ff")
+                }
 
-                run_kozlodoy()
+                stop_config = {
+                    'points': [(1203, 535), (1236, 535), (1203, 854), (1236, 854)],
+                    'lower': np.array([0, 100, 100]),
+                    'upper': np.array([10, 255, 255])
+                }
+
+                key_map = {"A": "a", "D": "d"}
+                run_color_detection(zones_config, key_map, stop_config)
                 sys.exit(0)
             elif service_name == "autoeat":
                 from modules.OtherService.autoeat import run_autoeat
@@ -284,6 +295,15 @@ def send_screenshot_to_telegram(screenshot_path):
         return False
 
 class MainWindow(QMainWindow):
+    def log_subprocess_output(self, process, service_name):
+        while process.poll() is None:
+            output = process.stdout.readline()
+            if output:
+                print(f"[{service_name}] {output.strip()}", "debug")
+        print(f"Процесс {service_name} завершился", "info")
+
+        self.inactive_counter = 0
+        self.bots_killed_due_to_inactivity = False
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Менеджер сервисов бота")
