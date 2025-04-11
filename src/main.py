@@ -11,7 +11,7 @@ import hashlib
 import threading
 import time
 import numpy as np
-
+import traceback
 
 
 
@@ -40,9 +40,18 @@ def run_service_mode():
                 run_port()
                 sys.exit(0)
             elif service_name == "stroyka":
+                print(f"[DEBUG] Запуск сервиса stroyka...")
                 from modules.WorkService.stroyka import run_stroyka
+                print(f"[DEBUG] Модуль успешно импортирован")
 
-                run_stroyka()
+                try:
+                    run_stroyka()
+                except Exception as e:
+                    print(f"[CRITICAL] Ошибка в run_stroyka: {str(e)}")
+                    traceback.print_exc()
+
+                print(
+                    f"[WARNING] run_stroyka завершился")  # Этой строки быть не должно, если функция работает правильно
                 sys.exit(0)
             elif service_name == "kozlodoy":
                 from modules.WorkService.kozlodoy import run_color_detection
@@ -1150,10 +1159,18 @@ class MainWindow(QMainWindow):
             # Получаем путь к текущему скрипту
             script_path = sys.argv[0]
             try:
-                self.processes["stroyka"] = subprocess.Popen(
-                    [python_executable, script_path, "--service=stroyka"],
-                    creationflags=subprocess.CREATE_NO_WINDOW  # Без окна
-                )
+                try:
+                    log_file = open("stroyka_log.txt", "w")
+                    self.processes["stroyka"] = subprocess.Popen(
+                        [python_executable, script_path, "--service=stroyka"],
+                        creationflags=subprocess.CREATE_NO_WINDOW,
+                        stdout=log_file,
+                        stderr=log_file,
+                        text=True,
+                        encoding='utf-8'
+                    )
+                    print(f"Запущен процесс с PID {self.processes['stroyka'].pid}, вывод перенаправлен в stroyka_log.txt")
+                finally:print('Привет')
                 self.stroyka_button.setText("Остановить работу на Стройке")
                 self.stroyka_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
                 print("Стройка запущена, PID:", self.processes["stroyka"].pid)
