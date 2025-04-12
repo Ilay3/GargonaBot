@@ -3,117 +3,215 @@ import numpy as np
 import pyautogui
 import time
 import os
+import sys
+import traceback
 from datetime import datetime, timedelta
 import pytz
+import platform
+import io
 
+# Настройка кодировки консоли
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 pyautogui.FAILSAFE = False
-# Часовой пояс Москвы
-moscow_tz = pytz.timezone('Europe/Moscow')
 
-# Загружаем эталонные изображения
-templates = {
-    "Iconlottery": cv2.imread('../../../resources/images/ImgLottery/Iconlottery.png', 0),
-    "Buttonlottery": cv2.imread('../../../resources/images/ImgLottery/Buttonlottery.png', 0),
-    "Backspacetriggerlottery": cv2.imread('../../../resources/images/ImgLottery/Backspacetriggerlottery.png', 0),
-    "Backspacetriggerlottery2": cv2.imread('../../../resources/images/ImgLottery/Backspacetriggerlottery2.png', 0),  # Добавлено второе изображение
-}
 
-def get_moscow_time():
-    """Возвращает текущее московское время."""
-    return datetime.now(moscow_tz)
+def load_templates():
+    """Загрузка шаблонов изображений с расширенным логированием"""
+    templates = {}
+    try:
+        print("[DEBUG][lottery] Determining base directory...")
+        base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+        print(f"[DEBUG][lottery] Base directory: {base_dir}")
 
-def get_timestamp():
-    """Возвращает текущую дату и время в формате YYYY-MM-DD_HH-MM-SS"""
-    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        # Стало:
+        resources_path = os.path.join(base_dir, 'resources', 'images', 'ImgLottery')
+        print(f"[DEBUG][lottery] Computed resources path: {resources_path}")
 
-def find_template_on_screen(template, threshold=0.9):
-    """Ищет шаблон на экране, возвращает координаты центра найденного объекта."""
-    screenshot = pyautogui.screenshot()
-    screenshot = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
-    gray_screen = cv2.cvtColor(screenshot, cv2.COLOR_BGR2GRAY)
-
-    res = cv2.matchTemplate(gray_screen, template, cv2.TM_CCOEFF_NORMED)
-    loc = np.where(res >= threshold)
-
-    if len(loc[0]) > 0:
-        y, x = loc[0][0], loc[1][0]  # OpenCV возвращает (y, x), но pyautogui ожидает (x, y)
-
-        center_x = x + template.shape[1] // 2
-        center_y = y + template.shape[0] // 2
-
-        # Проверяем, не выходит ли точка за пределы экрана
-        screen_width, screen_height = pyautogui.size()
-        if 0 <= center_x <= screen_width and 0 <= center_y <= screen_height:
-            print(f"Обнаружено изображение: ({x}, {y}), центр: ({center_x}, {center_y})")
-            return center_x, center_y
-        else:
-            print(f"Координаты ({center_x}, {center_y}) за пределами экрана!")
+        if not os.path.exists(resources_path):
+            print(f"[ERROR][lottery] Resources directory not found at: {resources_path}")
             return None
-    return None
 
-def run_process():
-    """Основной процесс поиска и нажатий."""
-    print("Процесс запущен")
-    pyautogui.press('up')
-    print("Нажата стрелка вверх")
+        print("[DEBUG][lottery] Loading template files...")
+        template_files = {
+            "Iconlottery": "Iconlottery.png",
+            "Buttonlottery": "Buttonlottery.png",
+            "Backspacetriggerlottery": "Backspacetriggerlottery.png",
+            "Backspacetriggerlottery2": "Backspacetriggerlottery2.png"
+        }
 
-    while True:
-        time.sleep(1)
-        pos1 = find_template_on_screen(templates["Iconlottery"])
+        for name, filename in template_files.items():
+            full_path = os.path.join(resources_path, filename)
+            print(f"[DEBUG][lottery] Attempting to load: {full_path}")
 
-        if pos1:
-            x, y = pos1
-            pyautogui.moveTo(x, y, duration=0.2)
-            pyautogui.click(x, y)
-            print(f"Клик по Iconlottery в координатах: {x}, {y}")
+            if not os.path.isfile(full_path):
+                print(f"[ERROR][lottery] Template file missing: {full_path}")
+                continue
+
+            img = cv2.imread(full_path, 0)
+            if img is None:
+                print(f"[ERROR][lottery] Failed to read image: {full_path}")
+                continue
+
+            templates[name] = img
+            print(f"[DEBUG][lottery] Successfully loaded {name} ({img.shape[1]}x{img.shape[0]})")
+
+        return templates
+
+    except Exception as e:
+        print(f"[CRITICAL][lottery] Load templates failed: {str(e)}")
+        traceback.print_exc()
+        return None
+
+
+def find_template(template, threshold=0.9):
+    """Поиск шаблона с логированием"""
+    try:
+        print(f"[DEBUG][lottery] Searching for template ({template.shape[1]}x{template.shape[0]})...")
+        screenshot = pyautogui.screenshot()
+        gray_screen = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2GRAY)
+        res = cv2.matchTemplate(gray_screen, template, cv2.TM_CCOEFF_NORMED)
+        loc = np.where(res >= threshold)
+
+        if len(loc[0]) > 0:
+            print(f"[DEBUG][lottery] Template found at {loc}")
+            return loc
+        else:
+            print("[DEBUG][lottery] Template not found")
+            return None
+
+    except Exception as e:
+        print(f"[ERROR][lottery] Template search failed: {str(e)}")
+        traceback.print_exc()
+        return None
+
+
+def run_process(templates):
+    """Основной процесс с детальным логированием"""
+    try:
+        print("[DEBUG][lottery] Starting main process...")
+        pyautogui.press('up')
+        print("[DEBUG][lottery] Sent UP key press")
+
+        # Поиск Iconlottery
+        print("[DEBUG][lottery] Searching for Iconlottery...")
+        icon_found = False
+        for attempt in range(5):
+            loc = find_template(templates["Iconlottery"])
+            if loc:
+                y, x = loc[0][0], loc[1][0]
+                center_x = x + templates["Iconlottery"].shape[1] // 2
+                center_y = y + templates["Iconlottery"].shape[0] // 2
+                print(f"[DEBUG][lottery] Clicking at ({center_x}, {center_y})")
+                pyautogui.click(center_x, center_y)
+                icon_found = True
+                break
+            print(f"[DEBUG][lottery] Iconlottery not found, attempt {attempt + 1}/5")
             time.sleep(1)
-            break
-        else:
-            print("Iconlottery не найдена, продолжаем поиск...")
 
-    while True:
-        time.sleep(1)
-        pos2 = find_template_on_screen(templates["Buttonlottery"])
+        if not icon_found:
+            print("[ERROR][lottery] Failed to find Iconlottery")
+            return False
 
-        if pos2:
-            x, y = pos2
-            pyautogui.moveTo(x, y, duration=0.2)
-            pyautogui.click(x, y)
-            print(f"Клик по Buttonlottery в координатах: {x}, {y}")
-            time.sleep(3)
-            break
-        else:
-            print("Buttonlottery не найдена, продолжаем поиск...")
+        # Поиск Buttonlottery
+        print("[DEBUG][lottery] Searching for Buttonlottery...")
+        button_found = False
+        for attempt in range(5):
+            loc = find_template(templates["Buttonlottery"])
+            if loc:
+                y, x = loc[0][0], loc[1][0]
+                center_x = x + templates["Buttonlottery"].shape[1] // 2
+                center_y = y + templates["Buttonlottery"].shape[0] // 2
+                print(f"[DEBUG][lottery] Clicking at ({center_x}, {center_y})")
+                pyautogui.click(center_x, center_y)
+                button_found = True
+                break
+            print(f"[DEBUG][lottery] Buttonlottery not found, attempt {attempt + 1}/5")
+            time.sleep(1)
 
-    while True:
-        time.sleep(0.05)
-        # Поиск любого из двух шаблонов для нажатия backspace
-        backspace_pos1 = find_template_on_screen(templates["Backspacetriggerlottery"])
-        backspace_pos2 = find_template_on_screen(templates["Backspacetriggerlottery2"])
+        if not button_found:
+            print("[ERROR][lottery] Failed to find Buttonlottery")
+            return False
 
-        if backspace_pos1 or backspace_pos2:
-            pyautogui.press('backspace')
-            pyautogui.press('backspace')
-            print("Обнаружено изображение для Backspace! Дважды нажат Backspace.")
-            time.sleep(7200)  # Ожидание 2 часа перед следующей проверкой
-            print("Процесс приостановлен на 2 часа.")
-            break
-        else:
-            print("Изображение для Backspace не найдено, продолжаем поиск...")
+        # Поиск триггеров Backspace
+        print("[DEBUG][lottery] Starting backspace trigger monitoring...")
+        start_time = time.time()
+        while time.time() - start_time < 300:
+            loc1 = find_template(templates["Backspacetriggerlottery"])
+            loc2 = find_template(templates["Backspacetriggerlottery2"])
 
-# Флаг для отслеживания последнего выполнения
-last_process_time = None
+            if loc1 or loc2:
+                print("[DEBUG][lottery] Trigger detected, pressing BACKSPACE")
+                pyautogui.press('backspace', presses=2, interval=0.1)
+                return True
 
-# Запуск кода с 12:01 до 23:59 по МСК
-while True:
-    now = get_moscow_time()
+            time.sleep(0.1)
 
-    # Если время в пределах с 12:01 до 23:59 по МСК, и прошло 2 часа с последнего выполнения
-    if 12 <= now.hour < 24 and (last_process_time is None or (now - last_process_time) > timedelta(hours=2)):
-        print(f"Запуск процесса в {now.strftime('%H:%M:%S')} по МСК")
-        run_process()
-        last_process_time = now  # Обновляем время последнего выполнения
+        print("[WARNING][lottery] Backspace trigger timeout")
+        return False
+
+    except Exception as e:
+        print(f"[CRITICAL][lottery] Process failed: {str(e)}")
+        traceback.print_exc()
+        return False
+
+
+def run_lottery_service():
+    """Главная функция сервиса с полным логированием"""
+    print("[INFO][lottery] === SERVICE STARTING ===")
+    print(f"[DEBUG][lottery] Platform: {platform.system()}")
+
+    if platform.system() != "Windows":
+        print("[CRITICAL][lottery] Windows required!")
+        return
+
+    print("[DEBUG][lottery] Initializing templates...")
+    templates = load_templates()
+
+    if not templates or len(templates) != 4:
+        print("[CRITICAL][lottery] Missing templates, aborting")
+        return
+
+    print("[DEBUG][lottery] All templates loaded successfully")
+    moscow_tz = pytz.timezone('Europe/Moscow')
+    last_process_time = None
+
+    try:
+        print("[INFO][lottery] === SERVICE STARTED ===")
+        while True:
+            now = datetime.now(moscow_tz)
+            print(f"[DEBUG][lottery] Current time: {now.strftime('%H:%M:%S')}")
+
+            if 12 <= now.hour < 24:
+                if last_process_time is None or (now - last_process_time) > timedelta(hours=2):
+                    print("[DEBUG][lottery] Starting new process cycle...")
+                    if run_process(templates):
+                        last_process_time = now
+                        print(f"[INFO][lottery] Process completed at {now.strftime('%H:%M:%S')}")
+                    else:
+                        print("[WARNING][lottery] Process failed, retrying in 5 minutes")
+                        time.sleep(300)
+                else:
+                    next_run = last_process_time + timedelta(hours=2)
+                    wait_time = (next_run - now).total_seconds()
+                    print(f"[DEBUG][lottery] Next run at {next_run.strftime('%H:%M:%S')} ({wait_time:.0f}s remaining)")
+                    time.sleep(30)
+            else:
+                print("[INFO][lottery] Outside working hours (12:00-23:59 MSK)")
+                time.sleep(300)
+
+    except KeyboardInterrupt:
+        print("[INFO][lottery] Service stopped by user")
+    except Exception as e:
+        print(f"[CRITICAL][lottery] Service crashed: {str(e)}")
+        traceback.print_exc()
+    finally:
+        print("[INFO][lottery] === SERVICE STOPPED ===")
+
+
+if __name__ == "__main__":
+    if "--service" in sys.argv:
+        run_lottery_service()
     else:
-        print(f"Ожидание... Сейчас {now.strftime('%H:%M:%S')} по МСК")
-        time.sleep(30)
+        print("[ERROR][lottery] Use --service flag to start")
