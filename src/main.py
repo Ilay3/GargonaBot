@@ -62,18 +62,12 @@ def run_service_mode():
         if arg.startswith("--service="):
             service_name = arg.split("=")[1]
             print("Сервис:", service_name)
-            import logging
-            logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
 
             if service_name == "antiafk":
-                logging.debug(f"Starting antiafk service, current service_name: {service_name}")
+
                 from modules.AntiAfkService.antiafk import run_antiafk
-                try:
-                    logging.info("Attempting to run antiafk service")
-                    run_antiafk()
-                    logging.info("Antiafk service exited normally")
-                except Exception as e:
-                    logging.error(f"Error in antiafk service: {str(e)}")
+                run_antiafk()
                 sys.exit(0)
 
             elif service_name == "waxta":
@@ -1039,50 +1033,34 @@ class MainWindow(QMainWindow):
                 print("Ошибка при остановке Autoeat:", e)
 
     def toggle_antiafk(self):
-        import logging
-        logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-
-        logging.debug(f"Toggle antiafk called. Current process state: {self.processes['antiafk']}")
-
         if self.processes["antiafk"] is None:
+            # Получаем путь к текущему интерпретатору Python
             python_executable = sys.executable
+            # Получаем путь к текущему скрипту
             script_path = sys.argv[0]
-            logging.info(f"Starting new process. Python: {python_executable} Script: {script_path}")
-
             try:
                 self.processes["antiafk"] = subprocess.Popen(
                     [python_executable, script_path, "--service=antiafk"],
-                    creationflags=subprocess.CREATE_NO_WINDOW
+                    creationflags=subprocess.CREATE_NO_WINDOW  # Без окна
                 )
-                logging.info(f"Process started with PID: {self.processes['antiafk'].pid}")
-
-                self.antiafk_button.setText("Остановить Anti-AFK")
-                self.antiafk_button.setStyleSheet("...")
-                print("Anti-AFK запущен, PID:", self.processes["antiafk"].pid)
-
+                self.autoeat_launch_button.setText("Остановить antiafk")
+                self.autoeat_launch_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+                print("antiafk запущен, PID:", self.processes["antiafk"].pid)
             except Exception as e:
-                logging.error(f"Process start failed: {str(e)}")
-                print("Ошибка при запуске Anti-AFK:", e)
-
+                print("Ошибка при запуске antiafk:", e)
         else:
-            logging.info("Stopping existing process")
             try:
                 self.processes["antiafk"].terminate()
-                exit_code = self.processes["antiafk"].wait(timeout=5)
-                logging.info(f"Process terminated with exit code: {exit_code}")
-
+                self.processes["antiafk"].wait()
                 self.processes["antiafk"] = None
-                self.antiafk_button.setText("Запустить Anti-AFK")
-                self.antiafk_button.setStyleSheet("...")
-                print("Anti-AFK остановлен.")
-
-            except subprocess.TimeoutExpired:
-                logging.warning("Process termination timeout, forcing kill")
-                self.processes["antiafk"].kill()
-
+                self.autoeat_launch_button.setText("Запустить antiafk")
+                self.autoeat_launch_button.setStyleSheet("font-size: 16px; padding: 10px;")
+                print("antiafk остановлен.")
             except Exception as e:
-                logging.error(f"Process stop failed: {str(e)}")
-                print("Ошибка при остановке Anti-AFK:", e)
+                print("Ошибка при остановке antiafk:", e)
+
+
 
     def toggle_koleso(self, checked):
         print(f"Toggle koleso: {checked}")  # <-- Добавлено
