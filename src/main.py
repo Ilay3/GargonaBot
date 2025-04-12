@@ -17,6 +17,42 @@ import traceback
 
 PYTHON_EXEC = sys.executable
 
+def send_screenshot_to_telegram(screenshot_path):
+    """
+    Загружает настройки из settings.json, отправляет скриншот в Telegram (через sendPhoto)
+    и возвращает True, если отправка успешна.
+    """
+    # Определяем корневую папку проекта
+    settings_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "settings.json"))
+    print(f"Using settings path: {settings_path}")
+    try:
+        with open(settings_path, "r", encoding="utf-8") as f:
+            settings = json.load(f)
+    except Exception as e:
+        print(f"Ошибка загрузки настроек из {settings_path}: {e}")
+        return False
+
+    token = settings.get("telegram_token", "")
+    chat_id = settings.get("telegram_chat_id", "")
+    if not token or not chat_id:
+        print("telegram_token или telegram_chat_id не заданы в настройках.")
+        return False
+
+    url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    try:
+        with open(screenshot_path, "rb") as photo:
+            response = requests.post(url, data={"chat_id": chat_id}, files={"photo": photo})
+        if response.status_code == 200:
+            print("Скриншот успешно отправлен в Telegram.")
+            return True
+        else:
+            print(f"Ошибка отправки скриншота: {response.text}")
+            return False
+    except Exception as e:
+        print(f"Исключение при отправке скриншота: {e}")
+        return False
+
+    from modules.AntiAfkService.krutkakoles import run_koleso
 def run_service_mode():
     print("Запуск сервисного режима!")
     for arg in sys.argv[1:]:
@@ -120,6 +156,15 @@ def run_service_mode():
 
                 run_Skolzkaya()
                 sys.exit(0)
+            elif service_name == "koleso":
+                from modules.AntiAfkService.krutkakoles import run_koleso
+                run_koleso(
+                    thresholds=0.9,
+                    check_interval=1,
+                    telegram_enabled=True
+                )
+                sys.exit(0)
+
     sys.exit(0)
 
 # Если передан флаг сервисного режима – запускаем его и выходим
@@ -268,40 +313,7 @@ PYTHON_EXEC = sys.executable
 #     except Exception as e:
 #         print(f" Ошибка при сохранении лицензии: {e}")
 
-def send_screenshot_to_telegram(screenshot_path):
-    """
-    Загружает настройки из settings.json, отправляет скриншот в Telegram (через sendPhoto)
-    и возвращает True, если отправка успешна.
-    """
-    # Определяем корневую папку проекта
-    settings_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "settings.json"))
-    print(f"Using settings path: {settings_path}")
-    try:
-        with open(settings_path, "r", encoding="utf-8") as f:
-            settings = json.load(f)
-    except Exception as e:
-        print(f"Ошибка загрузки настроек из {settings_path}: {e}")
-        return False
 
-    token = settings.get("telegram_token", "")
-    chat_id = settings.get("telegram_chat_id", "")
-    if not token or not chat_id:
-        print("telegram_token или telegram_chat_id не заданы в настройках.")
-        return False
-
-    url = f"https://api.telegram.org/bot{token}/sendPhoto"
-    try:
-        with open(screenshot_path, "rb") as photo:
-            response = requests.post(url, data={"chat_id": chat_id}, files={"photo": photo})
-        if response.status_code == 200:
-            print("Скриншот успешно отправлен в Telegram.")
-            return True
-        else:
-            print(f"Ошибка отправки скриншота: {response.text}")
-            return False
-    except Exception as e:
-        print(f"Исключение при отправке скриншота: {e}")
-        return False
 
 class MainWindow(QMainWindow):
     def log_subprocess_output(self, process, service_name):
@@ -1027,23 +1039,39 @@ class MainWindow(QMainWindow):
             self.antiafk_button.setStyleSheet("font-size: 16px; padding: 10px;")
 
     def toggle_koleso(self, checked):
+        print(f"Toggle koleso: {checked}")  # <-- Добавлено
         if checked:
-            wd = os.path.dirname(KRUTKAKOLES_PATH)
+            python_executable = sys.executable
+            script_path = sys.argv[0]
+            log_args = [python_executable, script_path, "--service=koleso"]
+            print(f"Попытка запуска процесса с аргументами: {log_args}")  # <-- Добавлено
+
             try:
-                proc = subprocess.Popen([PYTHON_EXEC, KRUTKAKOLES_PATH], cwd=wd)
-                self.processes["koleso"] = proc
-                print("Крутка колеса запущена, PID:", proc.pid)
+                self.processes["koleso"] = subprocess.Popen(
+                    [python_executable, script_path, "--service=koleso"],
+                    creationflags=subprocess.CREATE_NO_WINDOW,
+                    stdout=subprocess.PIPE,  # <-- Добавлено для перехвата вывода
+                    stderr=subprocess.STDOUT
+                )
+                print(f"Процесс запущен, PID: {self.processes['koleso'].pid}")
+
+                # Запустите отдельный поток для логирования вывода
+                def log_output(process, name):
+                    while True:
+                        output = process.stdout.readline()
+                        if not output and process.poll() is not None:
+                            break
+                        if output:
+                            print(f"[{name}]: {output.decode().strip()}")
+
+                threading.Thread(
+                    target=log_output,
+                    args=(self.processes["koleso"], "koleso"),
+                    daemon=True
+                ).start()
+
             except Exception as e:
-                print("Ошибка при запуске Крутки колеса:", e)
-        else:
-            if self.processes.get("koleso") is not None:
-                try:
-                    self.processes["koleso"].terminate()
-                    self.processes["koleso"].wait()
-                    print("Крутка колеса остановлена.")
-                except Exception as e:
-                    print("Ошибка при остановке Крутки колеса:", e)
-                self.processes["koleso"] = None
+                print(f"Ошибка запуска: {traceback.format_exc()}")  # <-- Добавлен traceback
 
     def toggle_lottery(self, checked):
         if checked:
@@ -1660,6 +1688,7 @@ def run_telegram_bot():
     updater.start_polling()
 
 if __name__ == "__main__":
+
     app = QApplication(sys.argv)
     # license_valid = False
     # expiry_date = load_license()
@@ -1715,3 +1744,4 @@ if __name__ == "__main__":
     tg_thread.start()
     print(">>> Telegram-бот запущен (используйте /start)")
     sys.exit(app.exec())
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
