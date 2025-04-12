@@ -69,6 +69,18 @@ def run_service_mode():
                 from modules.AntiAfkService.antiafk import run_antiafk
                 run_antiafk()
                 sys.exit(0)
+            elif service_name == "lottery":
+
+                print("[DEBUG][main1] Starting lottery service...")
+                try:
+                    from modules.AntiAfkService.lottery import run_lottery_service
+                    print("[DEBUG][main1] Module imported successfully")
+                    run_lottery_service()
+                    print("[DEBUG][main1] Service finished")
+                except Exception as e:
+                    print(f"[ERROR][main1] Failed to run service: {str(e)}")
+                    traceback.print_exc()
+                sys.exit(0)
 
             elif service_name == "waxta":
                 from modules.WorkService.waxta import run_waxta
@@ -169,6 +181,16 @@ def run_service_mode():
                     check_interval=1,
                     telegram_enabled=True
                 )
+                sys.exit(0)
+            elif service_name == "demorgan":
+                from modules.TuragaService.ShveiaDemorgan import run_shveia_demorgan
+
+                run_shveia_demorgan()
+                sys.exit(0)
+            elif service_name == "tochilka":
+                from modules.TuragaService.Tochilka import run_tochilka
+
+                run_tochilka()
                 sys.exit(0)
 
     sys.exit(0)
@@ -1101,23 +1123,43 @@ class MainWindow(QMainWindow):
                 print(f"Ошибка запуска: {traceback.format_exc()}")  # <-- Добавлен traceback
 
     def toggle_lottery(self, checked):
-        if checked:
-            wd = os.path.dirname(LOTTERY_PATH)
+        print(f"[DEBUG][main2] Toggle lottery called. Checked: {checked}")
+        if self.processes["lottery"] is None:
+            python_executable = sys.executable
+            script_path = sys.argv[0]
+            print(f"[DEBUG][main2] Launching process. Python: {python_executable}")
+            print(f"[DEBUG][main2] Script path: {script_path}")
+
             try:
-                proc = subprocess.Popen([PYTHON_EXEC, LOTTERY_PATH], cwd=wd)
-                self.processes["lottery"] = proc
-                print("Лотерея запущена, PID:", proc.pid)
+                self.processes["lottery"] = subprocess.Popen(
+                    [python_executable, script_path, "--service=lottery"],
+                    creationflags=subprocess.CREATE_NO_WINDOW,
+                    stdout=subprocess.PIPE,  # Capture output
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                print(f"[DEBUG][main2] Process started. PID: {self.processes['lottery'].pid}")
+
+                # Start thread to read outputs
+                threading.Thread(target=self.log_subprocess_output,
+                                 args=(self.processes["lottery"], "lottery")).start()
+
             except Exception as e:
-                print("Ошибка при запуске Лотереи:", e)
+                print(f"[ERROR][main2] Process start failed: {str(e)}")
+                traceback.print_exc()
         else:
-            if self.processes.get("lottery") is not None:
-                try:
-                    self.processes["lottery"].terminate()
-                    self.processes["lottery"].wait()
-                    print("Лотерея остановлена.")
-                except Exception as e:
-                    print("Ошибка при остановке Лотереи:", e)
-                self.processes["lottery"] = None
+            print("[DEBUG][main2] Stopping process...")
+            # Добавьте аналогичное логирование для остановки
+
+    def log_subprocess_output(self, process, name):
+        while True:
+            output = process.stdout.readline()
+            if output == '' and process.poll() is not None:
+                break
+            if output:
+                print(f"[SUBPROCESS {name}] {output.strip()}")
+        rc = process.poll()
+        print(f"[SUBPROCESS {name}] Exit code: {rc}")
 
     def toggle_cook(self):
         if self.cookbot_running:
@@ -1499,13 +1541,18 @@ class MainWindow(QMainWindow):
 
     def toggle_demorgan(self):
         if self.processes["demorgan"] is None:
-            wd = os.path.dirname(DEMORGAN_PATH)
+            # Получаем путь к текущему интерпретатору Python
+            python_executable = sys.executable
+            # Получаем путь к текущему скрипту
+            script_path = sys.argv[0]
             try:
-                proc = subprocess.Popen([PYTHON_EXEC, DEMORGAN_PATH], cwd=wd)
-                self.processes["demorgan"] = proc
+                self.processes["demorgan"] = subprocess.Popen(
+                    [python_executable, script_path, "--service=demorgan"],
+                    creationflags=subprocess.CREATE_NO_WINDOW  # Без окна
+                )
                 self.demorgan_button.setText("Остановить Пошив формы")
                 self.demorgan_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
-                print("Пошив формы запущен, PID:", proc.pid)
+                print("Пошив формы запущен, PID:", self.processes["demorgan"].pid)
             except Exception as e:
                 print("Ошибка при запуске Пошив формы:", e)
         else:
@@ -1521,13 +1568,18 @@ class MainWindow(QMainWindow):
 
     def toggle_tochilka(self):
         if self.processes["tochilka"] is None:
-            wd = os.path.dirname(TOCHILKA_PATH)
+            # Получаем путь к текущему интерпретатору Python
+            python_executable = sys.executable
+            # Получаем путь к текущему скрипту
+            script_path = sys.argv[0]
             try:
-                proc = subprocess.Popen([PYTHON_EXEC, TOCHILKA_PATH], cwd=wd)
-                self.processes["tochilka"] = proc
+                self.processes["tochilka"] = subprocess.Popen(
+                    [python_executable, script_path, "--service=tochilka"],
+                    creationflags=subprocess.CREATE_NO_WINDOW  # Без окна
+                )
                 self.tochilka_button.setText("Остановить Токарку")
                 self.tochilka_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
-                print("Точилка запущена, PID:", proc.pid)
+                print("Точилка запущена, PID:", self.processes["tochilka"].pid)
             except Exception as e:
                 print("Ошибка при запуске Точилки:", e)
         else:
