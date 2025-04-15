@@ -41,7 +41,7 @@ def find_and_click(image_name, offset_x=0, offset_y=0, confidence=0.8):
 
 def wait_for_correct_time():
     moscow_tz = pytz.timezone('Europe/Moscow')
-    target = dtime(0, 40)
+    target = dtime(7, 30)
     now = datetime.now(moscow_tz)
 
     # Если текущее время >= 07:10, то ждем до 7:10 следующего дня
