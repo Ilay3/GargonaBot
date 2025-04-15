@@ -145,8 +145,7 @@ def run_service_mode():
                 sys.exit(0)
             elif service_name == "cookbot":
                 from modules.CraftService.cook import run_cookbot
-                # Задаем параметры для командной строки
-                sys.argv = ['main.py', '--service=cookbot', '--dish', 'Салат', '--quantity', '40']
+
                 run_cookbot()
                 sys.exit(0)
             elif service_name == "kosyaki":
@@ -355,6 +354,7 @@ class MainWindow(QMainWindow):
         self.bots_killed_due_to_inactivity = False
     def __init__(self):
         super().__init__()
+        self.launch_game_button = None
         self.setWindowTitle("Менеджер сервисов бота")
         self.setGeometry(100, 100, 900, 600)
         # Обновлённый словарь процессов
@@ -1162,36 +1162,58 @@ class MainWindow(QMainWindow):
         print(f"[SUBPROCESS {name}] Exit code: {rc}")
 
     def toggle_cook(self):
-        if self.cookbot_running:
-            print("Остановка CookBot")
-            self.cookbot_process.terminate()  # Завершаем процесс CookBot
-            self.cookbot_process = None  # Очищаем процесс
-            self.cookbot_running = False  # Устанавливаем флаг в False
-            self.cook_button.setText("Запустить")  # Меняем текст кнопки
-        else:
-            print("Запуск CookBot...")
+        if self.processes["cook"] is None:
+            dish = self.dish_combo.currentText()
+            quantity = self.cook_input.text()
 
-            # Получаем параметры блюда и количества порций из интерфейса
-            dish = self.dish_combo.currentText()  # Выбираем блюдо из комбобокса
-            quantity = self.cook_input.text()  # Получаем количество порций
-
-            # Проверяем, что количество порций введено корректно
             if not quantity.isdigit():
-                self.cook_error_label.setText("Пожалуйста, введите корректное количество порций.")
+                self.cook_error_label.setText("Введите число!")
                 return
 
-            # Преобразуем количество порций в число (если необходимо)
-            quantity = int(quantity)
+            try:
+                script_path = os.path.abspath(
+                    os.path.join(
+                        os.path.dirname(__file__),
+                        "modules/CraftService/cook.py"
+                    )
+                )
 
-            # Задаем параметры командной строки, используя значения из интерфейса
-            sys.argv = ['main.py', '--service=cookbot', '--dish', dish, '--quantity', str(quantity)]
+                self.processes["cook"] = subprocess.Popen(
+                    [
+                        sys.executable,
+                        script_path,
+                        "--service=cookbot",
+                        "--dish", dish,
+                        "--quantity", quantity
+                    ],
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                )
 
-            # Импортируем и запускаем функцию из cook.py
-            from modules.CraftService.cook import run_cookbot
-            run_cookbot()
+                # Стиль как в toggle_waxta
+                self.cook_button.setText("Остановить приготовление")
+                self.cook_button.setStyleSheet(
+                    "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;"
+                )
+                print("CookBot запущен, PID:", self.processes["cook"].pid)
 
-            self.cookbot_running = True  # Устанавливаем флаг в True
-            self.cook_button.setText("Остановить")  # Меняем текст кнопки на "Остановить"
+            except Exception as e:
+                print("Ошибка при запуске CookBot:", e)
+                self.cook_error_label.setText(f"Ошибка: {str(e)}")
+
+        else:
+            try:
+                self.processes["cook"].terminate()
+                self.processes["cook"].wait()
+                self.processes["cook"] = None
+
+                # Возвращаем базовый стиль
+                self.cook_button.setText("Запустить приготовление")
+                self.cook_button.setStyleSheet("font-size: 16px; padding: 10px;")
+                print("Приготовление остановлено")
+
+            except Exception as e:
+                print("Ошибка при остановке CookBot:", e)
+                self.cook_error_label.setText(f"Ошибка остановки: {str(e)}")
 
     def toggle_waxta(self):
         if self.processes["waxta"] is None:
