@@ -1,30 +1,41 @@
+import sys
 import os
+from pathlib import Path
 import datetime
 import time
-from pathlib import Path
 from PIL import ImageGrab
 import keyboard
 
-# Указываем путь к папке для сохранения скриншотов
-save_dir = Path("../../../resources/screenshots/")
-save_dir.mkdir(parents=True, exist_ok=True)  # Создаем папку, если её нет
+def resource_path(relative_path):
+    """Возвращает абсолютный путь к файлу/ресурсу.
+    При запуске в режиме onefile используется sys._MEIPASS, иначе – текущая директория."""
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
-# Нажатие кнопки F10
+# Определяем путь к папке для скриншотов
+# Предполагается, что папка resources находится в корне проекта
+screenshots_dir = resource_path(os.path.join("resources", "screenshots"))
+save_dir = Path(screenshots_dir)
+
+try:
+    save_dir.mkdir(parents=True, exist_ok=True)
+except PermissionError as e:
+    print(f"Ошибка доступа при создании папки {save_dir}: {e}")
+    # Если доступ запрещён, попробуйте создать папку вручную или выберите другой путь
+    exit(1)
+
 keyboard.press_and_release('f10')
-
-# Задержка перед созданием скриншота
 time.sleep(3)
 
-# Формируем имя файла с датой и временем
 timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 screenshot_path = save_dir / f"screenshot_{timestamp}.png"
 
-# Делаем скриншот и сохраняем
 screenshot = ImageGrab.grab()
 screenshot.save(screenshot_path)
 
 print(f"Скриншот сохранен: {screenshot_path}")
-
-# Задержка перед нажатием ESC
 time.sleep(3)
 keyboard.press_and_release('esc')

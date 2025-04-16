@@ -20,7 +20,8 @@ def run_koleso(
         thresholds=0.9,
         check_interval=1,
         screenshot_dir="screenshots",
-        telegram_enabled=True
+        telegram_enabled=True,
+        result_check_attempts=10
 ):
     try:
         from main import send_screenshot_to_telegram
@@ -44,7 +45,8 @@ def run_koleso(
             "DostupKoleso": "DostupKoleso.png",
             "IconCasino": "IconCasino.png",
             "InterfaceKolesa": "InterfaceKolesa.png",
-            "ButtonKoloso": "ButtonKoloso.png"
+            "ButtonKoloso": "ButtonKoloso.png",
+            "ResultKoleso": "ResultKoleso.png"
         }
 
         try:
@@ -52,13 +54,18 @@ def run_koleso(
             for name, filename in templates_to_load:
                 abs_path = os.path.join(resources_path, 'ImgKoleso', filename)
                 img = cv2.imread(abs_path, 0)
-                templates[name] = img
-
-        except Exception:
+                if img is not None:
+                    templates[name] = img
+                else:
+                    print(f"Failed to load template: {filename}")
+                    return False
+            return True
+        except Exception as e:
+            print(f"Error loading templates: {str(e)}")
             return False
-        return True
 
     if not load_templates():
+        print("Failed to load templates. Exiting.")
         return
 
     def find_template(template_name, threshold=thresholds):
@@ -74,8 +81,8 @@ def run_koleso(
                 y, x = loc[0][0], loc[1][0]
                 return (x + template.shape[1] // 2, y + template.shape[0] // 2)
             return None
-
-        except Exception:
+        except Exception as e:
+            print(f"Template search error: {str(e)}")
             return None
 
     def safe_click(x, y, duration=0.2):
@@ -83,7 +90,8 @@ def run_koleso(
             pyautogui.moveTo(x, y, duration=duration)
             pyautogui.click()
             return True
-        except Exception:
+        except Exception as e:
+            print(f"Click error: {str(e)}")
             return False
 
     def process_step(template_name, action, attempts=max_attempts):
@@ -99,7 +107,8 @@ def run_koleso(
         while True:
             try:
                 if process_step("DostupKoleso", lambda pos: (
-                        time.sleep(5),
+
+                        time.sleep(65),
                         pyautogui.press('up')
                 )):
                     for step in ["IconCasino", "InterfaceKolesa"]:
@@ -107,22 +116,24 @@ def run_koleso(
                             break
 
                     if process_step("ButtonKoloso", lambda pos: safe_click(*pos)):
-                        time.sleep(5)
-                        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-                        os.makedirs(screenshot_dir, exist_ok=True)
-                        screenshot_path = os.path.join(screenshot_dir, f"{timestamp}_koleso.png")
+                        if process_step("ResultKoleso",
+                                      lambda pos: True,
+                                      attempts=result_check_attempts):
+                            time.sleep(3)
+                            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                            os.makedirs(screenshot_dir, exist_ok=True)
+                            screenshot_path = os.path.join(screenshot_dir, f"{timestamp}_koleso.png")
 
-                        try:
-                            pyautogui.screenshot(screenshot_path)
-                        except Exception:
-                            pass
-
-                        if telegram_enabled:
                             try:
-                                if send_screenshot_to_telegram(screenshot_path):
-                                    os.remove(screenshot_path)
-                            except Exception:
-                                pass
+                                pyautogui.screenshot(screenshot_path)
+                                if telegram_enabled:
+                                    try:
+                                        if send_screenshot_to_telegram(screenshot_path):
+                                            os.remove(screenshot_path)
+                                    except Exception as tg_error:
+                                        print(f"Telegram error: {str(tg_error)}")
+                            except Exception as screenshot_error:
+                                print(f"Screenshot error: {str(screenshot_error)}")
 
                         time.sleep(20)
                         pyautogui.press('esc')
@@ -133,22 +144,26 @@ def run_koleso(
                 time.sleep(check_interval)
 
             except KeyboardInterrupt:
+                print("Interrupted by user")
                 break
 
-            except Exception:
+            except Exception as e:
+                print(f"Main loop error: {str(e)}")
                 time.sleep(attempt_interval)
 
     finally:
-        pass
+        print("Koleso service stopped")
 
 if __name__ == "__main__":
     try:
         if any("--service=koleso" in arg for arg in sys.argv):
             run_koleso(
                 thresholds=0.9,
-                check_interval=1
+                check_interval=1,
+                result_check_attempts=15
             )
         else:
             print("Для запуска сервиса используйте флаг --service=koleso")
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Fatal error: {str(e)}")
+        traceback.print_exc()

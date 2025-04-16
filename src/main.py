@@ -1735,11 +1735,13 @@ def run_telegram_bot():
     dp = updater.dispatcher
 
     def cmd_start(update: Update, context: CallbackContext):
+        # Кнопки БЕЗ пробелов в начале
         keyboard = [
-            [KeyboardButton(" Anti-AFK"), KeyboardButton(" Авто-колесо"), KeyboardButton(" Лотерея")],
-            [KeyboardButton(" Реконнект"), KeyboardButton(" Статистика")],
+            [KeyboardButton("Anti-AFK"), KeyboardButton("Авто-колесо"), KeyboardButton("Лотерея")],
+            [KeyboardButton("Реконнект"), KeyboardButton("Статистика")],
         ]
-        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        update.message.reply_text("Выберите действие:", reply_markup=reply_markup)
         text = (
             "<b>Привет!</b> Я бот управления сервисами.\n"
             "Выберите действие, нажав кнопку внизу.\n\n"
@@ -1750,41 +1752,41 @@ def run_telegram_bot():
             "• Реконнект — перезапустить игру при вылете\n"
             "• Статистика — сделать скриншот статистики и отправить его в Telegram\n"
         )
-        update.message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+
 
     dp.add_handler(CommandHandler("start", cmd_start))
 
     def msg_handler(update: Update, context: CallbackContext):
-        global window
         text = update.message.text
-        if text == " Anti-AFK":
+        print(f"Получено сообщение: '{text}'")  # Отладка
+
+        if text == "Anti-AFK":
             window.toggle_antiafk()
             status = "запущен" if window.processes["antiafk"] else "остановлен"
-            update.message.reply_text(f"<b>Anti-AFK</b>: {status}", parse_mode=ParseMode.HTML)
-        elif text == " Авто-колесо":
-            if window.processes["koleso"] is None:
-                window.toggle_koleso(True)
-                update.message.reply_text(" <b>Авто-колесо</b> запущена.", parse_mode=ParseMode.HTML)
-            else:
-                window.toggle_koleso(False)
-                update.message.reply_text(" <b>Авто-колесо</b> остановлена.", parse_mode=ParseMode.HTML)
-        elif text == " Лотерея":
-            if window.processes["lottery"] is None:
-                window.toggle_lottery(True)
-                update.message.reply_text(" <b>Лотерея</b> запущена.", parse_mode=ParseMode.HTML)
-            else:
-                window.toggle_lottery(False)
-                update.message.reply_text("<b>Лотерея</b> остановлена.", parse_mode=ParseMode.HTML)
-        elif text == " Реконнект":
+            update.message.reply_text(f"Anti-AFK: {status}")
+
+        elif text == "Авто-колесо":
+            window.toggle_koleso(not window.chk_koleso.isChecked())
+            status = "запущено" if window.chk_koleso.isChecked() else "остановлено"
+            update.message.reply_text(f"Авто-колесо: {status}")
+
+        elif text == "Лотерея":
+            window.toggle_lottery(not window.chk_lottery.isChecked())
+            status = "запущена" if window.chk_lottery.isChecked() else "остановлена"
+            update.message.reply_text(f"Лотерея: {status}")
+
+        elif text == "Реконнект":
             if window.manual_reconnect():
-                update.message.reply_text(" <b>Реконнект</b> запущен немедленно.", parse_mode=ParseMode.HTML)
+                update.message.reply_text("Реконнект запущен!")
             else:
-                update.message.reply_text("️ <b>Реконнект</b>: произошла ошибка.", parse_mode=ParseMode.HTML)
-        elif text == " Статистика":
+                update.message.reply_text("Ошибка реконнекта!")
+
+        elif text == "Статистика":
             window.send_stats()
-            update.message.reply_text(" <b>Статистика</b> отправлена.", parse_mode=ParseMode.HTML)
+            update.message.reply_text("Статистика отправлена!")
+
         else:
-            update.message.reply_text("Неизвестная команда. Нажмите /start, чтобы открыть меню.", parse_mode=ParseMode.HTML)
+            update.message.reply_text("Неизвестная команда")
 
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, msg_handler))
     updater.start_polling()
