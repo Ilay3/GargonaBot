@@ -977,7 +977,7 @@ class MainWindow(QMainWindow):
             try:
                 self.processes["automood"] = subprocess.Popen(
                     [python_executable, script_path, "--service=automood"],
-                    creationflags=subprocess.CREATE_NO_WINDOW  # Без окна
+
                 )
                 self.automood_launch_button.setText("Остановить Авто-Настроение")
                 self.automood_launch_button.setStyleSheet(

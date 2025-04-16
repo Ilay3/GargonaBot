@@ -1,90 +1,80 @@
+import os
+import sys
 import time
 import pyautogui
-import os
-import keyboard  # Библиотека для отслеживания нажатий клавиш
+import keyboard
+import argparse
+import re
 
-pyautogui.FAILSAFE = False
-# Функция для поиска изображения на экране
+def get_resource_path(relative_path):
+    """Корректные пути для ресурсов в любом режиме"""
+    if getattr(sys, 'frozen', False):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+
 def find_image(image_name, confidence):
-    image_path = os.path.join('../../../resources/images/ImgShveiaDemorgan', image_name)
-    print(f"Ищу изображение: {image_name} с уверенностью: {confidence}, путь: {image_path}")  # Отладка
+    """Оптимизированный поиск изображений"""
+    image_path = get_resource_path(os.path.join('resources/images/ImgShveiaDemorgan', image_name))
+
     try:
-        location = pyautogui.locateCenterOnScreen(image_path, confidence=confidence)
-        if location:
-            print(f"Изображение {image_name} найдено: {location}")
-            return location
-    except pyautogui.ImageNotFoundException:
-        print(f"Изображение {image_name} не найдено.")
-    return None
+        location = pyautogui.locateCenterOnScreen(
+            image_path,
+            confidence=confidence,
+            grayscale=True,
+            minSearchTime=1
+        )
+        return location
+    except Exception:
+        return None
 
 
-# Функция для выполнения клика по координатам
-def click_at_location(location, repeat=False):
-    if location:
-        x, y = location
-        pyautogui.click(x, y)
-        print(f"Выполнен клик по координатам: ({x}, {y})")
-        if repeat:
-            time.sleep(0.5)
-            pyautogui.click(x, y)
-            print(f"Повторный клик по координатам: ({x}, {y})")
+def parse_arguments():
+    """Парсинг аргументов с поддержкой --service"""
+    parser = argparse.ArgumentParser(allow_abbrev=False)
+    parser.add_argument("--service", type=str, help="Сервисный режим (внутренний флаг)")
+    parser.add_argument("--confidence", type=float, default=0.95)
+    return parser.parse_known_args()[0]
 
 
-# Основная логика программы
-def main():
-    while True:  # Основной цикл, программа будет работать бесконечно, пока не завершится вручную
-        print("Нажмите 'E' для начала работы программы...")
+def run_shveia_demorgan():
+    """Главная функция с обработкой аргументов"""
+    try:
+        args = parse_arguments()
 
-        # Ожидание нажатия клавиши 'E'
+        # Конфигурация
+        image_files = [f'image{i}.png' for i in range(1, 21)]
+        image_config = {img: args.confidence for img in image_files}
+
         while True:
-            if keyboard.is_pressed('e'):
-                print("Нажата клавиша 'E', начинаем выполнение программы.")
-                break
-            time.sleep(0.1)  # Пауза, чтобы не нагружать процессор
+            keyboard.wait('e')
 
-        # Теперь программа будет работать после нажатия 'E'
-        image_confidences = {
-            'image1.png': 0.95,  # Установим уверенность на 0.95 для всех изображений
-            'image2.png': 0.95,
-            'image3.png': 0.95,
-            'image4.png': 0.95,
-            'image5.png': 0.95,
-            'image6.png': 0.95,
-            'image7.png': 0.95,
-            'image8.png': 0.95,
-            'image9.png': 0.95,
-            'image10.png': 0.95,
-            'image11.png': 0.95,
-            'image12.png': 0.95,
-            'image13.png': 0.95,
-            'image14.png': 0.95,
-            'image15.png': 0.95,
-            'image16.png': 0.95,
-            'image17.png': 0.95,
-            'image18.png': 0.95,
-            'image19.png': 0.95,
-            'image20.png': 0.95
-        }
+            # Поиск и клики
+            found = {}
+            for img, conf in image_config.items():
+                if loc := find_image(img, conf):
+                    found[img] = loc
 
-        locations = {}  # Словарь для хранения координат изображений
+            if not found:
+                continue
 
-        # Этап 1: Поиск всех изображений и сохранение координат
-        for image, confidence in image_confidences.items():
-            location = find_image(image, confidence)
+            # Сортировка и обработка
+            sorted_images = sorted(found.items(), key=lambda x: int(re.search(r'\d+', x[0]).group()))
+            for img, (x, y) in sorted_images:
+                num = int(re.search(r'\d+', img).group())
+                clicks = 1 if num in (1, 20) else 2
 
-            # Если не нашли с уверенностью 0.95, пробуем с пониженной уверенностью 0.90
-            if not location and confidence == 0.95:
-                print(f"Не удалось найти {image} с уверенностью 0.95, пробую с 0.90...")
-                location = find_image(image, 0.90)
+                for _ in range(clicks):
+                    pyautogui.click(x, y)
+                    time.sleep(0.1)
 
-            if location:
-                locations[image] = location
+            time.sleep(5)
 
-        # Этап 2: Последовательное нажатие по найденным точкам
-        for image, location in locations.items():
-            click_at_location(location, repeat=image not in ['image1.png', 'image20.png'])
+    except KeyboardInterrupt:
+        pass
 
-        print("Процесс завершен. Пауза на 10 секунд...")
 
-        # Пауза на 10 секунд перед повтором
-        time.sleep(10)
+if __name__ == "__main__":
+    run_shveia_demorgan()
