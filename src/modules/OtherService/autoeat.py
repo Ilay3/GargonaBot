@@ -20,7 +20,7 @@ def get_resource_path(relative_path):
 def run_autoeat(
     template_path=get_resource_path(os.path.join("resources", "images", "ImgEat", "golod.png")),
     settings_file=get_resource_path("settings.json"),
-    threshold=0.9,
+    threshold=0.7,
 ):
     print("Функция run_autoeat запущена.")
     """
@@ -35,10 +35,7 @@ def run_autoeat(
     """
     pyautogui.FAILSAFE = False
 
-    def log(message):
-        with open("autoeat.log", "a") as f:
-            f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}\n")
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}")
+    
 
     def load_settings():
         """Загружает настройки из файла settings.json."""
@@ -47,7 +44,7 @@ def run_autoeat(
                 with open(settings_file, "r") as f:
                     return json.load(f)
             except Exception as e:
-                log(f"Ошибка загрузки настроек: {e}")
+                print(f"Ошибка загрузки настроек: {e}")
         return {}
 
     def find_template_on_screen(template):
@@ -58,49 +55,49 @@ def run_autoeat(
 
         res = cv2.matchTemplate(gray_screen, template, cv2.TM_CCOEFF_NORMED)
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
-        log(f"Максимальное значение совпадения: {max_val}")
+        print(f"Максимальное значение совпадения: {max_val}")
 
         if max_val >= threshold:
-            log(f"Совпадение найдено! Координаты: {max_loc}")
+            print(f"Совпадение найдено! Координаты: {max_loc}")
             return True
         return False
 
     # Логирование путей
-    log(f"Абсолютный путь к шаблону: {template_path}")
-    log(f"Абсолютный путь к файлу настроек: {settings_file}")
+    print(f"Абсолютный путь к шаблону: {template_path}")
+    print(f"Абсолютный путь к файлу настроек: {settings_file}")
 
     # Проверка существования файлов
     if not os.path.exists(template_path):
-        log(f"Ошибка: файл шаблона не найден: {template_path}")
+        print(f"Ошибка: файл шаблона не найден: {template_path}")
         return
     if not os.path.exists(settings_file):
-        log(f"Ошибка: файл настроек не найден: {settings_file}")
+        print(f"Ошибка: файл настроек не найден: {settings_file}")
         return
 
     # Загрузка шаблона изображения
     template = cv2.imread(template_path, 0)
     if template is None:
-        log(f"Ошибка: не удалось загрузить изображение шаблона {template_path}")
+        print(f"Ошибка: не удалось загрузить изображение шаблона {template_path}")
         return
     else:
-        log("Шаблон успешно загружен.")
+        print("Шаблон успешно загружен.")
 
     # Загрузка настроек и получение клавиши для автоеда
     settings = load_settings()
     autoeat_key = settings.get("autoeat_key", "o")
-    log(f"Запуск скрипта Autoeat с клавишей: '{autoeat_key}'")
+    print(f"Запуск скрипта Autoeat с клавишей: '{autoeat_key}'")
 
-    log("Сервис запущен...")
+    print("Сервис запущен...")
     while True:
-        log("Поиск шаблона на экране...")
+        print("Поиск шаблона на экране...")
         if find_template_on_screen(template):
-            log("Шаблон обнаружен. Начинаем нажатия клавиши...")
+            print("Шаблон обнаружен. Начинаем нажатия клавиши...")
             while find_template_on_screen(template):
                 pyautogui.press(autoeat_key)
-                log(f"Обнаружен недостаток еды, нажата клавиша '{autoeat_key}'")
+                print(f"Обнаружен недостаток еды, нажата клавиша '{autoeat_key}'")
                 time.sleep(10)
         else:
-            log("Шаблон не обнаружен. Проверка через 15 секунд...")
+            print("Шаблон не обнаружен. Проверка через 15 секунд...")
         time.sleep(15)
 
 

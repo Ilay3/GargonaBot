@@ -35,11 +35,7 @@ def run_automood(
     """
     pyautogui.FAILSAFE = False
 
-    def log(message):
-        with open("automood.log", "a") as f:
-            f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}\n")
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}")
-
+    
     def load_settings():
         """Загружает настройки из файла settings.json."""
         if os.path.exists(settings_file):
@@ -47,7 +43,7 @@ def run_automood(
                 with open(settings_file, "r") as f:
                     return json.load(f)
             except Exception as e:
-                log(f"Ошибка загрузки настроек: {e}")
+                print(f"Ошибка загрузки настроек: {e}")
         return {}
 
     def find_template_on_screen(template):
@@ -58,49 +54,49 @@ def run_automood(
 
         res = cv2.matchTemplate(gray_screen, template, cv2.TM_CCOEFF_NORMED)
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
-        log(f"Максимальное значение совпадения: {max_val}")
+        print(f"Максимальное значение совпадения: {max_val}")
 
         if max_val >= threshold:
-            log(f"Совпадение найдено! Координаты: {max_loc}")
+            print(f"Совпадение найдено! Координаты: {max_loc}")
             return True
         return False
 
     # Логирование путей
-    log(f"Абсолютный путь к шаблону: {template_path}")
-    log(f"Абсолютный путь к файлу настроек: {settings_file}")
+    print(f"Абсолютный путь к шаблону: {template_path}")
+    print(f"Абсолютный путь к файлу настроек: {settings_file}")
 
     # Проверка существования файлов
     if not os.path.exists(template_path):
-        log(f"Ошибка: файл шаблона не найден: {template_path}")
+        print(f"Ошибка: файл шаблона не найден: {template_path}")
         return
     if not os.path.exists(settings_file):
-        log(f"Ошибка: файл настроек не найден: {settings_file}")
+        print(f"Ошибка: файл настроек не найден: {settings_file}")
         return
 
     # Загрузка шаблона изображения
     template = cv2.imread(template_path, 0)
     if template is None:
-        log(f"Ошибка: не удалось загрузить изображение шаблона {template_path}")
+        print(f"Ошибка: не удалось загрузить изображение шаблона {template_path}")
         return
     else:
-        log("Шаблон успешно загружен.")
+        print("Шаблон успешно загружен.")
 
     # Загрузка настроек и получение клавиши для automood
     settings = load_settings()
     automood_key = settings.get("automood_key", "l")
-    log(f"Запуск automood скрипта с клавишей: '{automood_key}'")
+    print(f"Запуск automood скрипта с клавишей: '{automood_key}'")
 
-    log("Сервис запущен...")
+    print("Сервис запущен...")
     while True:
-        log("Поиск шаблона на экране...")
+        print("Поиск шаблона на экране...")
         if find_template_on_screen(template):
-            log("Шаблон обнаружен. Начинаем нажатия клавиши...")
+            print("Шаблон обнаружен. Начинаем нажатия клавиши...")
             while find_template_on_screen(template):
                 pyautogui.press(automood_key)
-                log(f"Обнаружен недостаток настроения, нажата клавиша '{automood_key}'")
+                print(f"Обнаружен недостаток настроения, нажата клавиша '{automood_key}'")
                 time.sleep(10)
         else:
-            log("Шаблон не обнаружен. Проверка через 15 секунд...")
+            print("Шаблон не обнаружен. Проверка через 15 секунд...")
         time.sleep(15)
 
 

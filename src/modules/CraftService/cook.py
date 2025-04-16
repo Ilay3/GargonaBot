@@ -19,6 +19,7 @@ def get_resource_path(relative_path):
 def run_cookbot():
     try:
         parser = argparse.ArgumentParser()
+        parser.add_argument("script", nargs='?', help=argparse.SUPPRESS)
         parser.add_argument("--service", type=str, required=True)
         parser.add_argument("--dish", type=str, required=True)
         parser.add_argument("--quantity", type=int, required=True)

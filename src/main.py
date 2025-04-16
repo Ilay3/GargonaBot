@@ -1035,7 +1035,8 @@ class MainWindow(QMainWindow):
             try:
                 self.processes["autoeat"] = subprocess.Popen(
                     [python_executable, script_path, "--service=autoeat"],
-                    creationflags=subprocess.CREATE_NO_WINDOW  # Без окна
+
+
                 )
                 self.autoeat_launch_button.setText("Остановить Авто-Еда")
                 self.autoeat_launch_button.setStyleSheet(
@@ -1186,7 +1187,7 @@ class MainWindow(QMainWindow):
                         "--dish", dish,
                         "--quantity", quantity
                     ],
-                    creationflags=subprocess.CREATE_NO_WINDOW
+
                 )
 
                 # Стиль как в toggle_waxta
