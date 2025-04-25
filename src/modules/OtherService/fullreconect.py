@@ -42,15 +42,22 @@ except ImportError as e:
 # ===================================================
 
 def get_images_base_dir():
-    base_dir = os.path.abspath(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..", "..", "..",
-            "resources",
-            "images",
-            "ImgFullReconect"
+    # Определяем базовый путь в зависимости от того, скомпилирован код или нет
+    if getattr(sys, 'frozen', False):
+        # Режим исполнения после компиляции (EXE)
+        base_dir = os.path.join(sys._MEIPASS, 'resources', 'images', 'ImgFullReconect')
+    else:
+        # Режим разработки (исходный код)
+        base_dir = os.path.abspath(
+            os.path.join(
+                os.path.dirname(__file__),
+                "..", "..", "..",
+                "resources",
+                "images",
+                "ImgFullReconect"
+            )
         )
-    )
+
     print(f"[DEBUG] Путь к изображениям: {base_dir}")
     if not os.path.exists(base_dir):
         raise FileNotFoundError(f"[ERROR] Папка с изображениями не найдена: {base_dir}")
@@ -114,16 +121,26 @@ def process_spawn(spawn_type):
             return True
     return False
 
-def activate_window(window_title="Rage Multiplayer"):
+
+def activate_window(window_part="Rage Multiplayer"):
     try:
-        hwnd = win32gui.FindWindow(None, window_title)
-        if hwnd:
+        def callback(hwnd, hwnd_list):
+            title = win32gui.GetWindowText(hwnd)
+            if window_part.lower() in title.lower():
+                hwnd_list.append(hwnd)
+            return True
+
+        hwnd_list = []
+        win32gui.EnumWindows(callback, hwnd_list)
+
+        if hwnd_list:
+            hwnd = hwnd_list[0]
             win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
             win32gui.SetForegroundWindow(hwnd)
-            time.sleep(1)
-            print(f"[INFO] Окно {window_title} активировано")
+            print(f"[OK] Активировано окно: {win32gui.GetWindowText(hwnd)}")
             return True
-        print(f"[WARNING] Окно {window_title} не найдено")
+
+        print(f"[WARNING] Окно содержащее '{window_part}' не найдено")
         return False
     except Exception as e:
         print(f"[ERROR] Ошибка активации окна: {str(e)}")
@@ -265,12 +282,15 @@ def run_fullreconnect_bot():
         try:
             from screeninfo import get_monitors
             for m in get_monitors():
-                scale_factor = m.width / m.width_physical if m.width_physical else 1
-                print(f"[DEBUG] Монитор: {m.width}x{m.height} | Масштабирование: {scale_factor:.2f}")
+                scale_factor = 1.0
+                if hasattr(m, 'scale'):
+                    scale_factor = m.scale
+                elif hasattr(m, 'width_physical') and m.width_physical > 0:
+                    scale_factor = m.width / m.width_physical
+
+                print(f"[DEBUG] Монитор: {m.width}x{m.height} | Масштаб: {scale_factor:.1f}")
                 if scale_factor != 1.0:
-                    print("[WARNING] ВНИМАНИЕ! Обнаружено масштабирование экрана. Возможны проблемы с распознаванием элементов.")
-        except ImportError:
-            print("[WARNING] Установите screeninfo для проверки масштабирования: pip install screeninfo")
+                    print("[WARNING] Обнаружено масштабирование экрана!")
         except Exception as e:
             print(f"[ERROR] Ошибка проверки монитора: {str(e)}")
 
@@ -294,10 +314,15 @@ def run_fullreconnect_bot():
 
         parser = argparse.ArgumentParser()
         parser.add_argument("--service", type=str, default="reconnect")
-        parser.add_argument("settings_path", type=str)
+        parser.add_argument(
+            "--settings",
+            type=str,
+            default=os.path.join(os.environ["TEMP"], "settings.json"),
+            help="Path to settings file"
+        )
         args = parser.parse_args()
 
-        settings = load_settings(args.settings_path)
+        settings = load_settings(args.settings)
 
         print("[DEBUG] [FULLRECONNECT] Проверка активности игры...")
         if process_checker.is_game_active():
