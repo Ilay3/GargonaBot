@@ -3,16 +3,24 @@ import datetime
 from pathlib import Path
 from PIL import ImageGrab
 
-# Указываем путь к папке для сохранения скриншотов
-save_dir = Path("../../../resources/screenshots/")
-save_dir.mkdir(parents=True, exist_ok=True)  # Создаем папку, если её нет
 
-# Формируем имя файла с датой и временем
-timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-screenshot_path = save_dir / f"screenshot_{timestamp}.png"
+def take_screenshot():
+    try:
+        # Определяем корневую директорию проекта
+        base_dir = Path(__file__).resolve().parent.parent.parent
+        save_dir = base_dir / "resources" / "screenshots"
 
-# Делаем скриншот и сохраняем
-screenshot = ImageGrab.grab()
-screenshot.save(screenshot_path)
+        # Создаем директорию если не существует
+        save_dir.mkdir(parents=True, exist_ok=True)
 
-print(f"Скриншот сохранен: {screenshot_path}")
+        # Генерируем имя файла
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        screenshot_path = save_dir / f"screenshot_{timestamp}.png"
+
+        # Делаем и сохраняем скриншот
+        ImageGrab.grab().save(screenshot_path)
+        return str(screenshot_path)
+
+    except Exception as e:
+        print(f"[ERROR] Failed to take screenshot: {str(e)}")
+        return None

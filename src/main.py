@@ -947,6 +947,24 @@ class MainWindow(QMainWindow):
             print("Ошибка при запуске Manual Reconnect:", e)
             return False
 
+    def send_screenshot(self):
+        """Создает и отправляет кастомный скриншот"""
+        try:
+            from modules.OtherService.screenshot import take_screenshot
+
+            screenshot_path = take_screenshot()
+            if not screenshot_path:
+                return False
+
+            if send_screenshot_to_telegram(screenshot_path, "Custom Screenshot"):
+                os.remove(screenshot_path)
+                print("Custom screenshot sent and deleted")
+                return True
+            return False
+
+        except Exception as e:
+            print(f"Error in custom screenshot: {str(e)}")
+            return False
     def toggle_fullreconnect(self, checked: bool):
         """Управляет полным реконнектом"""
         try:
@@ -1770,7 +1788,7 @@ def run_telegram_bot():
         # Кнопки БЕЗ пробелов в начале
         keyboard = [
             [KeyboardButton("Anti-AFK"), KeyboardButton("Авто-колесо"), KeyboardButton("Лотерея")],
-            [KeyboardButton("Реконнект"), KeyboardButton("Полный реконнект"), KeyboardButton("Статистика")],
+            [KeyboardButton("Реконнект"), KeyboardButton("Полный реконнект"),KeyboardButton("Скриншот"), KeyboardButton("Статистика")],
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         update.message.reply_text("Выберите действие:", reply_markup=reply_markup)
@@ -1783,6 +1801,7 @@ def run_telegram_bot():
             "• Лотерея — запустить/остановить лотерею\n"
             "• Реконнект — реконнект после рестарта\n"
             "• Полный реконнект — реконнект при вылете игры\n"
+            "• Скриншот — скриншот в реальном времени\n"
             "• Статистика — сделать скриншот статистики и отправить его в Telegram\n"
         )
 
@@ -1797,6 +1816,12 @@ def run_telegram_bot():
             window.toggle_antiafk()
             status = "запущен" if window.processes["antiafk"] else "остановлен"
             update.message.reply_text(f"Anti-AFK: {status}")
+
+        elif text == "Скриншот":
+            if window.send_screenshot():
+                update.message.reply_text("Скриншот в реальном времени отправлен!")
+            else:
+                update.message.reply_text("Ошибка при создании скриншота")
 
         elif text == "Авто-колесо":
             window.toggle_koleso(not window.chk_koleso.isChecked())
