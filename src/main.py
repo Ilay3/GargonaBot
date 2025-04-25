@@ -17,7 +17,7 @@ import traceback
 
 PYTHON_EXEC = sys.executable
 
-def send_screenshot_to_telegram(screenshot_path):
+def send_screenshot_to_telegram(screenshot_path, message=None):
     """
     Загружает настройки из settings.json, отправляет скриншот в Telegram (через sendPhoto)
     и возвращает True, если отправка успешна.
@@ -41,7 +41,11 @@ def send_screenshot_to_telegram(screenshot_path):
     url = f"https://api.telegram.org/bot{token}/sendPhoto"
     try:
         with open(screenshot_path, "rb") as photo:
-            response = requests.post(url, data={"chat_id": chat_id}, files={"photo": photo})
+            data = {"chat_id": chat_id}
+            if message:
+                data["caption"] = message  # <-- добавляем текст
+
+            response = requests.post(url, data=data, files={"photo": photo})
         if response.status_code == 200:
             print("Скриншот успешно отправлен в Telegram.")
             return True
@@ -53,7 +57,6 @@ def send_screenshot_to_telegram(screenshot_path):
         return False
 
 
-    from modules.AntiAfkService.krutkakoles import run_koleso
 
 def run_service_mode():
     print("Запуск сервисного режима!")
@@ -278,7 +281,7 @@ SCHEMS_PATH      = os.path.join(MODULES_BASE, "MiniGamesService", "Schems.py")
 RECONNECT_PATH   = os.path.join(MODULES_BASE, "OtherService", "reconect.py")
 DEMORGAN_PATH    = os.path.join(MODULES_BASE, "TuragaService", "ShveiaDemorgan.py")
 TOCHILKA_PATH    = os.path.join(MODULES_BASE, "TuragaService", "Tochilka.py")
-
+FULLRECONNECT_PATH= os.path.join(MODULES_BASE, "OtherService", "fullreconect.py")
 PYTHON_EXEC = sys.executable
 
 # def get_device_id():
@@ -357,6 +360,7 @@ class MainWindow(QMainWindow):
         self.launch_game_button = None
         self.setWindowTitle("Менеджер сервисов бота")
         self.setGeometry(100, 100, 900, 600)
+        self.telegram_bot_enabled = False
         # Обновлённый словарь процессов
         self.processes = {
             "antiafk": None,
@@ -379,8 +383,10 @@ class MainWindow(QMainWindow):
             "telegram_bot": None,
             "schems": None,
             "reconnect": None,
+            "fullreconnect": None,
             "demorgan": None,
             "tochilka": None
+
         }
 
         self.inactive_counter = 0
@@ -551,10 +557,10 @@ class MainWindow(QMainWindow):
         self.taxi_button.setStyleSheet("font-size: 16px; padding: 10px;")
         self.taxi_button.clicked.connect(self.toggle_taxi)
         layout.addWidget(self.taxi_button)
-        self.fireman_button = QPushButton("Запустить работу Пожарным")
-        self.fireman_button.setStyleSheet("font-size: 16px; padding: 10px;")
-        self.fireman_button.clicked.connect(self.toggle_fireman)
-        layout.addWidget(self.fireman_button)
+        # self.fireman_button = QPushButton("Запустить работу Пожарным")
+        # self.fireman_button.setStyleSheet("font-size: 16px; padding: 10px;")
+        # self.fireman_button.clicked.connect(self.toggle_fireman)
+        # layout.addWidget(self.fireman_button)
         self.chk_autorun = QCheckBox("Авто-Бег")
         self.chk_autorun.setStyleSheet("""
             QCheckBox::indicator { width: 15px; height: 15px; }
@@ -941,6 +947,26 @@ class MainWindow(QMainWindow):
             print("Ошибка при запуске Manual Reconnect:", e)
             return False
 
+    def toggle_fullreconnect(self, checked: bool):
+        """Управляет полным реконнектом"""
+        try:
+            if checked:
+                from modules.OtherService.fullreconect import run_fullreconnect_bot
+                self.fullreconnect_thread = threading.Thread(
+                    target=run_fullreconnect_bot,
+                    daemon=True
+                )
+                self.fullreconnect_thread.start()
+                print("Полный реконнект запущен в отдельном потоке")
+            else:
+                if self.processes["fullreconnect"]:
+                    self.processes["fullreconnect"].terminate()
+                    self.processes["fullreconnect"] = None
+                    print("Полный реконнект остановлен")
+
+        except Exception as e:
+            print(f"Ошибка в toggle_fullreconnect: {str(e)}")
+            traceback.print_exc()
     def toggle_kosyaki(self):
         if self.processes.get("kosyaki") is None:
             # Получаем путь к текущему интерпретатору Python
@@ -1366,27 +1392,27 @@ class MainWindow(QMainWindow):
                 print("Работа в Такси остановлена.")
             except Exception as e:
                 print("Ошибка при остановке работы в Такси:", e)
-    def toggle_fireman(self):
-        if self.processes.get("fireman") is None:
-            wd = os.path.dirname(FIREMAN_PATH)
-            try:
-                proc = subprocess.Popen([PYTHON_EXEC, FIREMAN_PATH], cwd=wd)
-                self.processes["fireman"] = proc
-                self.fireman_button.setText("Остановить работу Пожарным")
-                self.fireman_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
-                print("Fireman запущен, PID:", proc.pid)
-            except Exception as e:
-                print("Ошибка при запуске Fireman:", e)
-        else:
-            try:
-                self.processes["fireman"].terminate()
-                self.processes["fireman"].wait()
-                self.processes["fireman"] = None
-                self.fireman_button.setText("Запустить работу Пожарным")
-                self.fireman_button.setStyleSheet("font-size: 16px; padding: 10px;")
-                print("Fireman остановлен.")
-            except Exception as e:
-                print("Ошибка при остановке Fireman:", e)
+    # def toggle_fireman(self):
+    #     if self.processes.get("fireman") is None:
+    #         wd = os.path.dirname(FIREMAN_PATH)
+    #         try:
+    #             proc = subprocess.Popen([PYTHON_EXEC, FIREMAN_PATH], cwd=wd)
+    #             self.processes["fireman"] = proc
+    #             self.fireman_button.setText("Остановить работу Пожарным")
+    #             self.fireman_button.setStyleSheet("font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
+    #             print("Fireman запущен, PID:", proc.pid)
+    #         except Exception as e:
+    #             print("Ошибка при запуске Fireman:", e)
+    #     else:
+    #         try:
+    #             self.processes["fireman"].terminate()
+    #             self.processes["fireman"].wait()
+    #             self.processes["fireman"] = None
+    #             self.fireman_button.setText("Запустить работу Пожарным")
+    #             self.fireman_button.setStyleSheet("font-size: 16px; padding: 10px;")
+    #             print("Fireman остановлен.")
+    #         except Exception as e:
+    #             print("Ошибка при остановке Fireman:", e)
 
     def toggle_kachalka(self):
         if self.processes.get("kachalka") is None:
@@ -1499,26 +1525,55 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 print("Ошибка при остановке schems:", e)
 
-    def toggle_reconnect(self, checked):
-        if checked:
-            try:
+    def toggle_reconnect(self, checked: bool):
+        """Управляет реконнектом через аргумент checked"""
+        try:
+            if checked:
+                if self.processes.get("reconnect") is not None:
+                    print("[DEBUG] Реконнект уже запущен")
+                    return
+
+                print("[DEBUG] Запуск реконнекта...")
                 settings_path = os.path.join(PROJECT_ROOT, "settings.json")
-                proc = subprocess.Popen([PYTHON_EXEC, RECONNECT_PATH, settings_path],
-                                        cwd=os.path.dirname(RECONNECT_PATH))
+
+                # Явно указываем полный путь к скрипту
+                reconnect_script = os.path.abspath(
+                    os.path.join(MODULES_BASE, "OtherService", "reconnect.py")
+                )
+
+                proc = subprocess.Popen(
+                    [
+                        PYTHON_EXEC,
+                        reconnect_script,
+                        "--service=reconnect",
+                        settings_path
+                    ],
+                    stdout=open('reconnect.log', 'w'),
+                    stderr=subprocess.STDOUT,
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                )
                 self.processes["reconnect"] = proc
-                print("Reconnect запущен, PID:", proc.pid)
-            except Exception as e:
-                print("Ошибка запуска reconnect:", e)
-        else:
-            if self.processes.get("reconnect") is not None:
-                try:
-                    proc = self.processes["reconnect"]
-                    proc.terminate()
-                    proc.wait()
+                print(f"[DEBUG] PID процесса: {proc.pid}")
+                time.sleep(2)  # Даем процессу время инициализироваться
+
+                # Проверяем жизнеспособность процесса
+                if proc.poll() is not None:
+                    print("[ERROR] Процесс завершился сразу после запуска")
+                    with open('reconnect.log', 'r') as f:
+                        print(f"Логи процесса:\n{f.read()}")
+
+                self.chk_myservice.setChecked(True)
+            else:
+                    # Остановка реконнекта
+                    if self.processes.get("reconnect") is not None:
+                        self.processes["reconnect"].terminate()
                     self.processes["reconnect"] = None
-                    print("Reconnect остановлен.")
-                except Exception as e:
-                    print("Ошибка при остановке reconnect:", e)
+                    print("Реконнект остановлен")
+                    self.chk_myservice.setChecked(False)  # Синхронизируем чекбокс
+        except Exception as e:
+            print(f"[CRITICAL] Ошибка: {str(e)}")
+            traceback.print_exc()
+
 
     def check_game_active(self):
         if process_checker.is_game_active():
@@ -1651,49 +1706,26 @@ class MainWindow(QMainWindow):
             msgBox.exec()
 
     from pathlib import Path
+    from modules.OtherService.screenshotstats import take_screenshot
 
     def send_stats(self):
+        from modules.OtherService.screenshotstats import take_screenshot
         """
-        Метод для отправки статистики:
-          - Запускает скрипт screenshotstats.py (который делает скриншот),
-          - Ждёт пару секунд,
-          - Ищет созданный файл,
-          - Отправляет его в Telegram,
-          - При успешной отправке удаляет файл.
+        Метод для создания и отправки скриншота статистики
         """
-        from pathlib import Path
+        try:
+            # Создаем скриншот используя встроенный метод
+            screenshot_path = take_screenshot()
 
-        # Путь к скрипту screenshotstats.py (предполагается, что он находится в modules/OtherService/)
-        screenshotstats_path = os.path.join(MODULES_BASE, "OtherService", "screenshotstats.py")
-        if not os.path.exists(screenshotstats_path):
-            print("Файл screenshotstats.py не найден.")
-            return
-
-        # Запускаем скрипт и ждём его завершения (блокирующий вызов)
-        subprocess.run([PYTHON_EXEC, screenshotstats_path])
-
-        # Добавляем задержку, чтобы убедиться, что файл записался
-        time.sleep(2)
-
-        # Папка, куда скрипт сохраняет скриншоты
-        screenshot_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "resources", "screenshots"))
-        from pathlib import Path
-        screenshot_dir = Path(screenshot_dir)
-        files = list(screenshot_dir.glob("screenshot_*.png"))
-
-        # Для отладки выведите список найденных файлов
-        print("Найденные файлы:", files)
-
-        if not files:
-            print("Скриншот не найден после выполнения скрипта.")
-            return
-
-        screenshot_file = max(files, key=lambda p: p.stat().st_mtime)
-        if send_screenshot_to_telegram(str(screenshot_file)):
-            os.remove(str(screenshot_file))
-            print("Скриншот отправлен и удалён.")
-        else:
-            print("Ошибка отправки скриншота.")
+            # Отправляем скриншот
+            if send_screenshot_to_telegram(screenshot_path):
+                os.remove(screenshot_path)
+                print("Скриншот отправлен и удалён.")
+                return True
+            return False
+        except Exception as e:
+            print(f"Ошибка при создании скриншота: {str(e)}")
+            return False
 
 
     def kill_all_bots(self):
@@ -1738,7 +1770,7 @@ def run_telegram_bot():
         # Кнопки БЕЗ пробелов в начале
         keyboard = [
             [KeyboardButton("Anti-AFK"), KeyboardButton("Авто-колесо"), KeyboardButton("Лотерея")],
-            [KeyboardButton("Реконнект"), KeyboardButton("Статистика")],
+            [KeyboardButton("Реконнект"), KeyboardButton("Полный реконнект"), KeyboardButton("Статистика")],
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         update.message.reply_text("Выберите действие:", reply_markup=reply_markup)
@@ -1749,7 +1781,8 @@ def run_telegram_bot():
             "• Anti-AFK — запустить/остановить систему анти-АФК\n"
             "• Авто-колесо — провернуть колесо удачи\n"
             "• Лотерея — запустить/остановить лотерею\n"
-            "• Реконнект — перезапустить игру при вылете\n"
+            "• Реконнект — реконнект после рестарта\n"
+            "• Полный реконнект — реконнект при вылете игры\n"
             "• Статистика — сделать скриншот статистики и отправить его в Telegram\n"
         )
 
@@ -1776,10 +1809,20 @@ def run_telegram_bot():
             update.message.reply_text(f"Лотерея: {status}")
 
         elif text == "Реконнект":
-            if window.manual_reconnect():
-                update.message.reply_text("Реконнект запущен!")
-            else:
-                update.message.reply_text("Ошибка реконнекта!")
+            current_state = window.processes.get("reconnect") is not None
+            print(f"Текущее состояние: {current_state}")
+
+            window.toggle_reconnect(checked=not current_state)
+            time.sleep(1)  # Ожидаем обновления статуса
+
+            new_state = window.processes.get("reconnect") is not None
+            status = "запущен" if new_state else "остановлен"
+            update.message.reply_text(f"Реконнект {status}")
+        elif text == "Полный реконнект":
+            is_active = window.processes.get("fullreconnect") is not None
+            window.toggle_fullreconnect(checked=not is_active)
+            status = "запущен" if not is_active else "остановлен"
+            update.message.reply_text(f"Полный реконнект {status}")
 
         elif text == "Статистика":
             window.send_stats()
