@@ -1092,8 +1092,8 @@ class MainWindow(QMainWindow):
                     [python_executable, script_path, "--service=antiafk"],
                     creationflags=subprocess.CREATE_NO_WINDOW  # Без окна
                 )
-                self.autoeat_launch_button.setText("Остановить antiafk")
-                self.autoeat_launch_button.setStyleSheet(
+                self.antiafk_button.setText("Остановить antiafk")
+                self.antiafk_button.setStyleSheet(
                     "font-size: 16px; padding: 10px; background-color: #ff7043; color: white;")
                 print("antiafk запущен, PID:", self.processes["antiafk"].pid)
             except Exception as e:
@@ -1103,8 +1103,8 @@ class MainWindow(QMainWindow):
                 self.processes["antiafk"].terminate()
                 self.processes["antiafk"].wait()
                 self.processes["antiafk"] = None
-                self.autoeat_launch_button.setText("Запустить antiafk")
-                self.autoeat_launch_button.setStyleSheet("font-size: 16px; padding: 10px;")
+                self.antiafk_button.setText("Запустить antiafk")
+                self.antiafk_button.setStyleSheet("font-size: 16px; padding: 10px;")
                 print("antiafk остановлен.")
             except Exception as e:
                 print("Ошибка при остановке antiafk:", e)

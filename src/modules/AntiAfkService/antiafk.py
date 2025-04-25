@@ -10,7 +10,7 @@ import pydirectinput
 
 def run_antiafk(
         keys=['w', 'a', 's', 'd'],
-        interval=240,
+        interval=180,
         log_file=None
 ):
     """
