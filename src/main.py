@@ -13,7 +13,34 @@ import time
 import numpy as np
 import traceback
 
+from PySide6.QtWidgets import QInputDialog, QMessageBox
 
+def authenticate():
+    """
+    Спрашивает у пользователя лицензионный ключ и проверяет его на сервере.
+    Если ключ валиден — сохраняет локально и возвращает дату истечения.
+    В противном случае повторяет ввод.
+    """
+    while True:
+        # Открываем диалог для ввода ключа
+        key, ok = QInputDialog.getText(None, "Авторизация", "Введите лицензионный ключ:")
+        if not ok:
+            # Пользователь отменил ввод — завершаем приложение
+            sys.exit(1)
+
+        # Отправляем ключ на сервер
+        success, expiry = validate_key(key)
+        if success:
+            # Сохраняем локально и возвращаем дату окончания
+            save_license(key, expiry)
+            return expiry
+
+        # Если неуспешно — предупреждаем и цикл повторяется
+        QMessageBox.warning(
+            None,
+            "Ошибка лицензии",
+            "Неверный ключ или срок истёк.\nПопробуйте ещё раз."
+        )
 
 PYTHON_EXEC = sys.executable
 
@@ -1860,52 +1887,8 @@ def run_telegram_bot():
 if __name__ == "__main__":
 
     app = QApplication(sys.argv)
-    license_valid = False
-    expiry_date = load_license()
-    if expiry_date:
-        now = datetime.datetime.now()
-        if expiry_date > now:
-            print(f" Подписка активна до {expiry_date}")
-            license_valid = True
-        else:
-            print(" Подписка истекла. Требуется новый ключ!")
-    else:
-        print(" Ключ не найден. Требуется активация!")
-    if not license_valid:
-        license_dialog = QDialog()
-        license_dialog.setWindowTitle("Аутентификация")
-        license_dialog.setFixedSize(400, 300)
-        layout = QVBoxLayout(license_dialog)
-        logo_label = QLabel(" Введите лицензионный ключ")
-        logo_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(logo_label)
-        key_input = QLineEdit()
-        key_input.setPlaceholderText("Введите лицензионный ключ")
-        layout.addWidget(key_input)
-        activate_button = QPushButton("Активировать")
-        layout.addWidget(activate_button)
-        message_label = QLabel("")
-        message_label.setAlignment(Qt.AlignCenter)
-        message_label.setStyleSheet("color: #ff7043; font-size: 16px;")
-        layout.addWidget(message_label)
-        def on_activate():
-            key = key_input.text().strip()
-            success, expiry = validate_key(key)
-            if success:
-                save_license(key, expiry)
-                message_label.setText(f" Активировано! Подписка до: {expiry}")
-                license_dialog.accept()
-            else:
-                message_label.setText(" Ошибка активации. Проверьте ключ.")
-        activate_button.clicked.connect(on_activate)
-        if license_dialog.exec() != QDialog.Accepted:
-            print(" Активация не завершена. Выход...")
-            sys.exit(1)
-        license_valid = True
-    if not license_valid:
-        print(" Подписка недействительна. Запуск невозможен.")
-        sys.exit(1)
-    print(" Запуск основного приложения...")
+    expiry_date = authenticate()
+
     window = MainWindow()
     window.setWindowTitle("Менеджер сервисов бота")
     window.setGeometry(100, 100, 900, 600)
@@ -1914,4 +1897,4 @@ if __name__ == "__main__":
     tg_thread.start()
     print(">>> Telegram-бот запущен (используйте /start)")
     sys.exit(app.exec())
-    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(file))))
