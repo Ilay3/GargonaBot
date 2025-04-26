@@ -97,18 +97,17 @@ def run_service_mode():
                 run_port()
                 sys.exit(0)
             elif service_name == "stroyka":
-                print(f"[DEBUG] Запуск сервиса stroyka...")
+
                 from modules.WorkService.stroyka import run_stroyka
-                print(f"[DEBUG] Модуль успешно импортирован")
+
 
                 try:
                     run_stroyka()
                 except Exception as e:
-                    print(f"[CRITICAL] Ошибка в run_stroyka: {str(e)}")
+
                     traceback.print_exc()
 
-                print(
-                    f"[WARNING] run_stroyka завершился")  # Этой строки быть не должно, если функция работает правильно
+
                 sys.exit(0)
             elif service_name == "kozlodoy":
                 from modules.WorkService.kozlodoy import run_color_detection
@@ -214,7 +213,7 @@ from PySide6.QtWidgets import (
 
 
 
-SERVER_URL = "http://83.220.165.162:5000"
+SERVER_URL = "http://2.56.89.210:5000/"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if os.path.isdir(os.path.join(BASE_DIR, "src")):
     PROJECT_ROOT = BASE_DIR
@@ -284,64 +283,64 @@ TOCHILKA_PATH    = os.path.join(MODULES_BASE, "TuragaService", "Tochilka.py")
 FULLRECONNECT_PATH= os.path.join(MODULES_BASE, "OtherService", "fullreconect.py")
 PYTHON_EXEC = sys.executable
 
-# def get_device_id():
-#     return hex(uuid.getnode())
-#
-# def get_hwid():
-#     mac = str(uuid.getnode())
-#     computer_name = os.environ.get('COMPUTERNAME', 'unknown')
-#     processor = platform.processor()
-#     combined = mac + computer_name + processor
-#     return hashlib.sha256(combined.encode()).hexdigest()
+def get_device_id():
+    return hex(uuid.getnode())
 
-# def validate_key(key: str):
-#     hwid = get_hwid()
-#     print(f" Отправляем на сервер:\n  Ключ: {key}\n  HWID: {hwid}")
-#     try:
-#         response = requests.post(f"{SERVER_URL}/validate", json={"key": key, "hwid": hwid})
-#         data = response.json()
-#         print(f" Ответ сервера: {data}")
-#         if response.status_code == 200:
-#             expiry_date_str = data.get("expiry_date")
-#             expiry_date = datetime.datetime.strptime(expiry_date_str, "%Y-%m-%d %H:%M:%S")
-#             print(f" Ключ действителен. Подписка до {expiry_date}")
-#             return True, expiry_date
-#         else:
-#             print(f"❌ Ошибка: {data.get('message', 'Unknown error')}")
-#             return False, None
-#     except requests.RequestException as e:
-#         print(f" Ошибка подключения к серверу: {e}")
-#         return False, None
+def get_hwid():
+    mac = str(uuid.getnode())
+    computer_name = os.environ.get('COMPUTERNAME', 'unknown')
+    processor = platform.processor()
+    combined = mac + computer_name + processor
+    return hashlib.sha256(combined.encode()).hexdigest()
 
-# def load_license():
-#     if os.path.exists(LICENSE_FILE):
-#         try:
-#             with open(LICENSE_FILE, "r") as f:
-#                 license_info = json.load(f)
-#             stored_hwid = license_info.get("hwid")
-#             current_hwid = get_hwid()
-#             if stored_hwid != current_hwid:
-#                 print(" HWID не совпадает! Требуется повторная активация.")
-#                 return None
-#             expiry_date_str = license_info.get("expiry_date")
-#             if expiry_date_str:
-#                 return datetime.datetime.strptime(expiry_date_str, "%Y-%m-%d %H:%M:%S")
-#         except Exception as e:
-#             print(f" Ошибка загрузки лицензии: {e}")
-#     return None
+def validate_key(key: str):
+    hwid = get_hwid()
+    print(f" Отправляем на сервер:\n  Ключ: {key}\n  HWID: {hwid}")
+    try:
+        response = requests.post(f"{SERVER_URL}/validate", json={"key": key, "hwid": hwid})
+        data = response.json()
+        print(f" Ответ сервера: {data}")
+        if response.status_code == 200:
+            expiry_date_str = data.get("expiry_date")
+            expiry_date = datetime.datetime.strptime(expiry_date_str, "%Y-%m-%d %H:%M:%S")
+            print(f" Ключ действителен. Подписка до {expiry_date}")
+            return True, expiry_date
+        else:
+            print(f"❌ Ошибка: {data.get('message', 'Unknown error')}")
+            return False, None
+    except requests.RequestException as e:
+        print(f" Ошибка подключения к серверу: {e}")
+        return False, None
 
-# def save_license(key, expiry_date):
-#     license_info = {
-#         "key": key,
-#         "hwid": get_hwid(),
-#         "expiry_date": expiry_date.strftime("%Y-%m-%d %H:%M:%S")
-#     }
-#     try:
-#         with open(LICENSE_FILE, "w") as f:
-#             json.dump(license_info, f)
-#         print(f"Лицензия сохранена: подписка до {expiry_date}")
-#     except Exception as e:
-#         print(f" Ошибка при сохранении лицензии: {e}")
+def load_license():
+    if os.path.exists(LICENSE_FILE):
+        try:
+            with open(LICENSE_FILE, "r") as f:
+                license_info = json.load(f)
+            stored_hwid = license_info.get("hwid")
+            current_hwid = get_hwid()
+            if stored_hwid != current_hwid:
+                print(" HWID не совпадает! Требуется повторная активация.")
+                return None
+            expiry_date_str = license_info.get("expiry_date")
+            if expiry_date_str:
+                return datetime.datetime.strptime(expiry_date_str, "%Y-%m-%d %H:%M:%S")
+        except Exception as e:
+            print(f" Ошибка загрузки лицензии: {e}")
+    return None
+
+def save_license(key, expiry_date):
+    license_info = {
+        "key": key,
+        "hwid": get_hwid(),
+        "expiry_date": expiry_date.strftime("%Y-%m-%d %H:%M:%S")
+    }
+    try:
+        with open(LICENSE_FILE, "w") as f:
+            json.dump(license_info, f)
+        print(f"Лицензия сохранена: подписка до {expiry_date}")
+    except Exception as e:
+        print(f" Ошибка при сохранении лицензии: {e}")
 
 
 
@@ -392,15 +391,15 @@ class MainWindow(QMainWindow):
         self.inactive_counter = 0
         self.bots_killed_due_to_inactivity = False
 
-        # self.license_expiry = load_license()
-        #
-        # self.license_check_timer = QTimer(self)
-        # self.license_check_timer.timeout.connect(self.periodic_license_check)
-        # self.license_check_timer.start(3600000)
+        self.license_expiry = load_license()
 
-        # self.keyboard_timer = QTimer(self)
-        # self.keyboard_timer.timeout.connect(self.check_keyboard_layout)
-        # self.keyboard_timer.start(10000)
+        self.license_check_timer = QTimer(self)
+        self.license_check_timer.timeout.connect(self.periodic_license_check)
+        self.license_check_timer.start(3600000)
+
+        self.keyboard_timer = QTimer(self)
+        self.keyboard_timer.timeout.connect(self.check_keyboard_layout)
+        self.keyboard_timer.start(10000)
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -429,10 +428,10 @@ class MainWindow(QMainWindow):
         self.menu_list.currentRowChanged.connect(self.switch_page)
         left_layout.addWidget(self.menu_list)
 
-        # self.license_label = QLabel()
-        # self.license_label.setStyleSheet("font-size: 14px; color: #ff7043;")
-        # left_layout.addWidget(self.license_label)
-        # left_layout.setAlignment(self.license_label, Qt.AlignBottom)
+        self.license_label = QLabel()
+        self.license_label.setStyleSheet("font-size: 14px; color: #ff7043;")
+        left_layout.addWidget(self.license_label)
+        left_layout.setAlignment(self.license_label, Qt.AlignBottom)
 
         main_layout.addWidget(left_panel, 1)
 
@@ -468,9 +467,9 @@ class MainWindow(QMainWindow):
         self.game_timer.timeout.connect(self.check_game_active)
         self.game_timer.start(1000)
 
-        # self.license_timer = QTimer(self)
-        # self.license_timer.timeout.connect(self.update_license_label)
-        # self.license_timer.start(1000)
+        self.license_timer = QTimer(self)
+        self.license_timer.timeout.connect(self.update_license_label)
+        self.license_timer.start(1000)
 
     def create_home_page(self):
         widget = QWidget()
@@ -1324,12 +1323,11 @@ class MainWindow(QMainWindow):
             script_path = sys.argv[0]
             try:
                 try:
-                    log_file = open("stroyka_log.txt", "w")
+
                     self.processes["stroyka"] = subprocess.Popen(
                         [python_executable, script_path, "--service=stroyka"],
-                        creationflags=subprocess.CREATE_NO_WINDOW,
-                        stdout=log_file,
-                        stderr=log_file,
+
+
                         text=True,
                         encoding='utf-8'
                     )
@@ -1689,30 +1687,30 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 print("Ошибка при остановке Точилки:", e)
 
-    # def periodic_license_check(self):
-    #     if self.license_expiry:
-    #         now = datetime.datetime.now()
-    #         if now >= self.license_expiry:
-    #             print(" Лицензия истекла. Завершение работы приложения.")
-    #             error_dialog = QDialog(self)
-    #             error_dialog.setWindowTitle("Ошибка лицензии")
-    #             dlg_layout = QVBoxLayout(error_dialog)
-    #             msg_label = QLabel("Срок действия лицензии истек. Приложение будет закрыто.")
-    #             msg_label.setAlignment(Qt.AlignCenter)
-    #             dlg_layout.addWidget(msg_label)
-    #             error_dialog.exec()
-    #             QApplication.quit()
-    #
-    # def update_license_label(self):
-    #     if self.license_expiry:
-    #         now = datetime.datetime.now()
-    #         remaining = self.license_expiry - now
-    #         if remaining.total_seconds() <= 0:
-    #             self.license_label.setText("Подписка истекла")
-    #         else:
-    #             self.license_label.setText("Подписка до: " + self.license_expiry.strftime("%Y-%m-%d %H:%M"))
-    #     else:
-    #         self.license_label.setText("Лицензия не активирована")
+    def periodic_license_check(self):
+        if self.license_expiry:
+            now = datetime.datetime.now()
+            if now >= self.license_expiry:
+                print(" Лицензия истекла. Завершение работы приложения.")
+                error_dialog = QDialog(self)
+                error_dialog.setWindowTitle("Ошибка лицензии")
+                dlg_layout = QVBoxLayout(error_dialog)
+                msg_label = QLabel("Срок действия лицензии истек. Приложение будет закрыто.")
+                msg_label.setAlignment(Qt.AlignCenter)
+                dlg_layout.addWidget(msg_label)
+                error_dialog.exec()
+                QApplication.quit()
+
+    def update_license_label(self):
+        if self.license_expiry:
+            now = datetime.datetime.now()
+            remaining = self.license_expiry - now
+            if remaining.total_seconds() <= 0:
+                self.license_label.setText("Подписка истекла")
+            else:
+                self.license_label.setText("Подписка до: " + self.license_expiry.strftime("%Y-%m-%d %H:%M"))
+        else:
+            self.license_label.setText("Лицензия не активирована")
 
     def check_keyboard_layout(self):
         if get_keyboard_layout() != LANG_ENGLISH:
@@ -1862,51 +1860,51 @@ def run_telegram_bot():
 if __name__ == "__main__":
 
     app = QApplication(sys.argv)
-    # license_valid = False
-    # expiry_date = load_license()
-    # if expiry_date:
-    #     now = datetime.datetime.now()
-    #     if expiry_date > now:
-    #         print(f" Подписка активна до {expiry_date}")
-    #         license_valid = True
-    #     else:
-    #         print(" Подписка истекла. Требуется новый ключ!")
-    # else:
-    #     print(" Ключ не найден. Требуется активация!")
-    # if not license_valid:
-    #     license_dialog = QDialog()
-    #     license_dialog.setWindowTitle("Аутентификация")
-    #     license_dialog.setFixedSize(400, 300)
-    #     layout = QVBoxLayout(license_dialog)
-    #     logo_label = QLabel(" Введите лицензионный ключ")
-    #     logo_label.setAlignment(Qt.AlignCenter)
-    #     layout.addWidget(logo_label)
-    #     key_input = QLineEdit()
-    #     key_input.setPlaceholderText("Введите лицензионный ключ")
-    #     layout.addWidget(key_input)
-    #     activate_button = QPushButton("Активировать")
-    #     layout.addWidget(activate_button)
-    #     message_label = QLabel("")
-    #     message_label.setAlignment(Qt.AlignCenter)
-    #     message_label.setStyleSheet("color: #ff7043; font-size: 16px;")
-    #     layout.addWidget(message_label)
-    #     def on_activate():
-    #         key = key_input.text().strip()
-    #         success, expiry = validate_key(key)
-    #         if success:
-    #             save_license(key, expiry)
-    #             message_label.setText(f" Активировано! Подписка до: {expiry}")
-    #             license_dialog.accept()
-    #         else:
-    #             message_label.setText(" Ошибка активации. Проверьте ключ.")
-    #     activate_button.clicked.connect(on_activate)
-    #     if license_dialog.exec() != QDialog.Accepted:
-    #         print(" Активация не завершена. Выход...")
-    #         sys.exit(1)
-    #     license_valid = True
-    # if not license_valid:
-    #     print(" Подписка недействительна. Запуск невозможен.")
-    #     sys.exit(1)
+    license_valid = False
+    expiry_date = load_license()
+    if expiry_date:
+        now = datetime.datetime.now()
+        if expiry_date > now:
+            print(f" Подписка активна до {expiry_date}")
+            license_valid = True
+        else:
+            print(" Подписка истекла. Требуется новый ключ!")
+    else:
+        print(" Ключ не найден. Требуется активация!")
+    if not license_valid:
+        license_dialog = QDialog()
+        license_dialog.setWindowTitle("Аутентификация")
+        license_dialog.setFixedSize(400, 300)
+        layout = QVBoxLayout(license_dialog)
+        logo_label = QLabel(" Введите лицензионный ключ")
+        logo_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(logo_label)
+        key_input = QLineEdit()
+        key_input.setPlaceholderText("Введите лицензионный ключ")
+        layout.addWidget(key_input)
+        activate_button = QPushButton("Активировать")
+        layout.addWidget(activate_button)
+        message_label = QLabel("")
+        message_label.setAlignment(Qt.AlignCenter)
+        message_label.setStyleSheet("color: #ff7043; font-size: 16px;")
+        layout.addWidget(message_label)
+        def on_activate():
+            key = key_input.text().strip()
+            success, expiry = validate_key(key)
+            if success:
+                save_license(key, expiry)
+                message_label.setText(f" Активировано! Подписка до: {expiry}")
+                license_dialog.accept()
+            else:
+                message_label.setText(" Ошибка активации. Проверьте ключ.")
+        activate_button.clicked.connect(on_activate)
+        if license_dialog.exec() != QDialog.Accepted:
+            print(" Активация не завершена. Выход...")
+            sys.exit(1)
+        license_valid = True
+    if not license_valid:
+        print(" Подписка недействительна. Запуск невозможен.")
+        sys.exit(1)
     print(" Запуск основного приложения...")
     window = MainWindow()
     window.setWindowTitle("Менеджер сервисов бота")
