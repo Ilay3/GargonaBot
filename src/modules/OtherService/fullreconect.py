@@ -6,11 +6,16 @@ import pyautogui
 import argparse
 import traceback
 import requests
+import cv2
+import numpy as np
+import easyocr
 from datetime import datetime
 import pytz
 import win32gui
 import win32con
 from ctypes import windll, c_int
+
+reader = easyocr.Reader(['ru', 'en'])
 
 # ===================================================
 # 0. Настройки DPI и прав администратора
@@ -32,22 +37,21 @@ print(f"[DEBUG] Добавлен путь к проекту: {project_root}")
 try:
     from main import send_screenshot_to_telegram
     from modules.ProcessChecker import process_checker
+
     print("[DEBUG] Модули успешно импортированы")
 except ImportError as e:
     print(f"[ERROR] Ошибка импорта: {str(e)}")
     raise
+
 
 # ===================================================
 # 2. Конфигурация путей
 # ===================================================
 
 def get_images_base_dir():
-    # Определяем базовый путь в зависимости от того, скомпилирован код или нет
     if getattr(sys, 'frozen', False):
-        # Режим исполнения после компиляции (EXE)
         base_dir = os.path.join(sys._MEIPASS, 'resources', 'images', 'ImgFullReconect')
     else:
-        # Режим разработки (исходный код)
         base_dir = os.path.abspath(
             os.path.join(
                 os.path.dirname(__file__),
@@ -63,6 +67,7 @@ def get_images_base_dir():
         raise FileNotFoundError(f"[ERROR] Папка с изображениями не найдена: {base_dir}")
     return base_dir
 
+
 IMAGES_BASE_DIR = get_images_base_dir()
 
 # ===================================================
@@ -71,8 +76,41 @@ IMAGES_BASE_DIR = get_images_base_dir()
 
 pyautogui.FAILSAFE = False
 
+
+def find_text_easyocr(text, region=None):
+    screenshot = pyautogui.screenshot(region=region)
+    img = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
+
+    results = reader.readtext(img, paragraph=False)
+
+    for (bbox, word, confidence) in results:
+        if text.lower() in word.lower():
+            x_center = int((bbox[0][0] + bbox[2][0]) / 2)
+            y_center = int((bbox[0][1] + bbox[2][1]) / 2)
+            if region:
+                x_center += region[0]
+                y_center += region[1]
+            return (x_center, y_center)
+    return None
+
+
+def try_find_and_click_text(text, max_attempts=10, offset=(0, 0), region=None):
+    for attempt in range(1, max_attempts + 1):
+        print(f"[DEBUG] Попытка {attempt} найти текст '{text}'")
+        pos = find_text_easyocr(text, region)
+        if pos:
+            x, y = pos
+            target_x = int(x + offset[0])
+            target_y = int(y + offset[1])
+            pyautogui.click(target_x, target_y)
+            print(f"[SUCCESS] Найден текст '{text}' и кликнут")
+            return True
+        time.sleep(3)
+    print(f"[WARNING] Текст '{text}' не найден после {max_attempts} попыток")
+    return False
+
+
 def try_find_and_click(image_name, max_attempts=10, confidence=0.8, offset=(0, 0), region=None):
-    """Пытается найти и кликнуть по изображению до max_attempts раз."""
     print(f"[DEBUG] Поиск изображения {image_name} (макс. попыток: {max_attempts})")
     image_path = get_image_path(image_name)
 
@@ -101,6 +139,7 @@ def try_find_and_click(image_name, max_attempts=10, confidence=0.8, offset=(0, 0
 
     print(f"[WARNING] Изображение {image_name} не найдено после {max_attempts} попыток")
     return False
+
 
 def process_spawn(spawn_type):
     spawn_images = {
@@ -146,6 +185,7 @@ def activate_window(window_part="Rage Multiplayer"):
         print(f"[ERROR] Ошибка активации окна: {str(e)}")
         return False
 
+
 def get_image_path(image_name):
     image_path = os.path.join(IMAGES_BASE_DIR, image_name)
     print(f"[DEBUG] Проверка изображения: {image_path}")
@@ -153,13 +193,14 @@ def get_image_path(image_name):
         raise FileNotFoundError(f"[ERROR] Изображение отсутствует: {image_path}")
     return image_path
 
+
 def check_resources():
     print("[DEBUG] Начало проверки ресурсов")
     required_images = [
         "image1.png", "image21.png", "image6.png",
-        "image3.png", "image5.png", "image4.png",
-        "image7.png", "imagevyhod.png",
-        "dom.png", "kvartira.png", "spawn.png", "lasttochka.png"
+        "cursor.png", "image4.png", "image7.png",
+        "imagevyhod.png", "dom.png", "kvartira.png",
+        "spawn.png", "lasttochka.png"
     ]
 
     missing = []
@@ -177,8 +218,8 @@ def check_resources():
         raise RuntimeError(error_msg)
     print("[DEBUG] Все ресурсы проверены")
 
+
 def find_and_click(image_name, confidence=0.8, offset=(0, 0), region=None):
-    """Бесконечный поиск изображения до успешного клика"""
     print(f"[DEBUG] Начало поиска изображения: {image_name}")
     try:
         image_path = get_image_path(image_name)
@@ -222,6 +263,7 @@ def find_and_click(image_name, confidence=0.8, offset=(0, 0), region=None):
         print(traceback.format_exc())
         return False
 
+
 def load_settings(settings_path):
     print(f"[DEBUG] Загрузка настроек из: {settings_path}")
     default_settings = {
@@ -262,6 +304,7 @@ def load_settings(settings_path):
 
         return settings
 
+
 # ===================================================
 # 4. Основная логика
 # ===================================================
@@ -299,8 +342,9 @@ def run_fullreconnect_bot():
                 ("image1.png", 0, 0, 1),
                 ("image21.png", 0, 0, 1),
                 ("image6.png", 0, 0, 1),
-                ("image3.png", 30, 0, 1),
-                ("image5.png", 0, 0, 1),
+                ("cursor.png", 0, 0, 1),
+                ("Пароль", 30, 0, 1),
+                ("Войти", 0, 0, 1),
                 ("image4.png", 0, 0, 1)
             ],
             "exit_image": "imagevyhod.png"
@@ -350,7 +394,6 @@ def run_fullreconnect_bot():
             print(f"[ERROR] Путь к RageMP не существует: {rage_mp_path}")
             return
 
-        # Основной цикл обработки
         spawn_failed = False
         last_processed_step = -1
 
@@ -360,6 +403,68 @@ def run_fullreconnect_bot():
 
             activate_window()
             print(f"[INFO] Обработка шага {idx + 1}/{len(CONFIG['image_sequence'])}: {image}")
+
+            if image == "cursor.png":
+                print("[DEBUG] Проверка наличия курсора")
+                success = try_find_and_click(
+                    image,
+                    max_attempts=3,
+                    confidence=0.7,
+                    offset=(offset_x, offset_y)
+                )
+                if not success:
+                    print("[WARNING] Курсор не найден, нажимаю F2")
+                    pyautogui.press('f2')
+                    time.sleep(1)
+                continue
+
+            if image == "Пароль":
+                print("[DEBUG] Поиск поля для ввода пароля")
+                success = try_find_and_click_text(
+                    text=image,
+                    offset=(offset_x, offset_y),
+                    region=(0, 0, 1920, 1080)
+                )
+                if not success:
+                    print("[CRITICAL] Не удалось найти поле для пароля!")
+                    spawn_failed = True
+                    last_processed_step = idx
+                    break
+
+                print("[ACTION] Ввод пароля...")
+                pyautogui.write(settings["password"])
+                time.sleep(1)
+                continue
+
+            if image == "Войти":
+                print("[DEBUG] Поиск кнопки входа")
+                success = try_find_and_click_text(
+                    text=image,
+                    offset=(offset_x, offset_y),
+                    region=(0, 0, 1920, 1080)
+                )
+                if not success:
+                    print("[CRITICAL] Не удалось найти кнопку входа!")
+                    spawn_failed = True
+                    last_processed_step = idx
+                    break
+
+                # Новый блок: выбор персонажа после входа
+                print("[INFO] Ожидание загрузки интерфейса (4 сек)...")
+                time.sleep(4)
+
+                selected_character = settings.get("character", "First")
+                target_pos = character_positions.get(selected_character)
+
+                if not target_pos:
+                    print(f"[ERROR] Неизвестный персонаж: {selected_character}, используется First")
+                    target_pos = character_positions["First"]
+
+                print(f"[ACTION] Клик по позиции {selected_character}: {target_pos}")
+                pyautogui.click(target_pos)
+                print("[INFO] Ожидание 2 секунды после выбора...")
+                time.sleep(2)
+                continue
 
             if image == "image4.png":
                 print("[DEBUG] Поиск image4 с расширенными параметрами")
@@ -377,34 +482,8 @@ def run_fullreconnect_bot():
 
             find_and_click(image, offset=(offset_x, offset_y))
 
-            if image == "image3.png":
-                print("[ACTION] Ввод пароля...")
-                pyautogui.write(settings["password"])
-                time.sleep(1)
-
-            if image == "image5.png":
-                print("[ACTION] Выбор персонажа...")
-                time.sleep(3)
-
-                selected_character = settings.get("character", "First")
-                target_pos = character_positions.get(selected_character)
-
-                if not target_pos:
-                    print(f"[ERROR] Неизвестный персонаж: {selected_character}, используется First")
-                    target_pos = character_positions["First"]
-
-                print(f"[ACTION] Клик по позиции {selected_character}: {target_pos}")
-                pyautogui.click(target_pos)
-                time.sleep(1)
-                print("[INFO] Ожидание загрузки интерфейса...")
-                time.sleep(5)
-
-                print("[INFO] Дополнительное ожидание перед поиском спауна")
-                time.sleep(5)
-
             last_processed_step = idx
 
-        # Попытка выбрать точку спауна по настройке
         spawn_type = settings.get("spawn")
         spawn_failed = False
 
@@ -417,7 +496,6 @@ def run_fullreconnect_bot():
         else:
             print("[INFO] Тип спауна не указан, выбор спауна пропущен")
 
-        # Попытка найти и нажать image7 (подтверждение спауна)
         if not spawn_failed:
             print("[INFO] Поиск и нажатие image7 (подтверждение)")
             found_image7 = try_find_and_click("image7.png", max_attempts=15, confidence=0.7)
@@ -427,7 +505,6 @@ def run_fullreconnect_bot():
         else:
             print("[ERROR] Не удалось выполнить спаун, пропускаем подтверждение image7")
 
-        # Создание скриншота и отправка результата
         try:
             screenshot_dir = os.path.join(project_root, "screenshots")
             os.makedirs(screenshot_dir, exist_ok=True)
@@ -463,6 +540,7 @@ def run_fullreconnect_bot():
     except Exception as e:
         print(f"[CRITICAL] Критическая ошибка: {str(e)}")
         print(traceback.format_exc())
+
 
 if __name__ == "__main__":
     check_resources()
