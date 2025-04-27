@@ -7,41 +7,73 @@ import os
 import traceback
 from datetime import datetime
 import platform
-import requests
-import io
+import json
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+sys.stdout = sys.__stdout__
+sys.stderr = sys.__stderr__
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+def get_base_path():
+    """Возвращает корректный путь к ресурсам для EXE и исходного кода"""
+    if getattr(sys, 'frozen', False):
+        # Путь при запуске из EXE
+        return sys._MEIPASS
+    else:
+        # Путь при запуске из исходного кода
+        return os.path.dirname(os.path.abspath(__file__))
+def send_screenshot_to_telegram(screenshot_path, message=None):
+    try:
+        from main import send_screenshot_to_telegram as _send
+        return _send(screenshot_path, message)
+    except ImportError:
+        return False
+    except Exception as e:
+        print(f"Telegram error: {str(e)}")
+        return False
+
 
 def run_koleso(
-        templates_config=None,
         thresholds=0.9,
         check_interval=1,
         screenshot_dir="screenshots",
-        telegram_enabled=True,
         result_check_attempts=10
 ):
-    try:
-        from main import send_screenshot_to_telegram
-    except ImportError:
-        telegram_enabled = False
+    print("\n" + "=" * 40)
+    print(f"[{datetime.now()}] Starting Koleso service")
+    print(f"Threshold: {thresholds}")
+    print(f"Check interval: {check_interval}s")
+    print("=" * 40)
 
     if platform.system() != "Windows":
+        print("Windows required!")
+        return
+
+    # Проверка прав записи
+    try:
+        test_file = os.path.join(screenshot_dir, "test_koleso.txt")
+        with open(test_file, "w") as f:
+            f.write("test")
+        os.remove(test_file)
+        print("Write test: OK")
+    except Exception as e:
+        print(f"Write error: {str(e)}")
         return
 
     pyautogui.FAILSAFE = False
-    max_attempts = 5
-    attempt_interval = 10
     templates = {}
 
     def load_templates():
-        nonlocal templates
-        base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
-        resources_path = os.path.join(base_dir, 'resources', 'images')
+        print("\nLoading templates...")
+        base_dir = get_base_path()
+        resources_path = os.path.join(
+            base_dir,
+            'resources',
+            'images',
+            'ImgKoleso'
+        )
 
-        default_templates = {
+        print(f"Resource path: {resources_path}")
+
+        template_files = {
             "DostupKoleso": "DostupKoleso.png",
             "IconCasino": "IconCasino.png",
             "InterfaceKolesa": "InterfaceKolesa.png",
@@ -49,65 +81,89 @@ def run_koleso(
             "ResultKoleso": "ResultKoleso.png"
         }
 
-        try:
-            templates_to_load = templates_config or default_templates.items()
-            for name, filename in templates_to_load:
-                abs_path = os.path.join(resources_path, 'ImgKoleso', filename)
-                img = cv2.imread(abs_path, 0)
-                if img is not None:
-                    templates[name] = img
-                else:
-                    print(f"Failed to load template: {filename}")
-                    return False
-            return True
-        except Exception as e:
-            print(f"Error loading templates: {str(e)}")
-            return False
+        for name, filename in template_files.items():
+            path = os.path.join(resources_path, filename)
+            print(f"Loading: {path}")
 
-    if not load_templates():
-        print("Failed to load templates. Exiting.")
-        return
+            if not os.path.exists(path):
+                print(f"File not found: {path}")
+                return False
+
+            img = cv2.imread(path, 0)
+            if img is not None:
+                templates[name] = img
+                print(f"Loaded {name} ({img.shape[1]}x{img.shape[0]})")
+            else:
+                print(f"Failed to load: {filename}")
+                return False
+        return True
 
     def find_template(template_name, threshold=thresholds):
         try:
+            print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Searching: {template_name}")
             template = templates[template_name]
             screenshot = pyautogui.screenshot()
-            screenshot = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
-            gray_screen = cv2.cvtColor(screenshot, cv2.COLOR_BGR2GRAY)
+            gray = cv2.cvtColor(np.array(screenshot), cv2.COLOR_BGR2GRAY)
 
-            res = cv2.matchTemplate(gray_screen, template, cv2.TM_CCOEFF_NORMED)
-            loc = np.where(res >= threshold)
-            if len(loc[0]) > 0:
-                y, x = loc[0][0], loc[1][0]
-                return (x + template.shape[1] // 2, y + template.shape[0] // 2)
+            res = cv2.matchTemplate(gray, template, cv2.TM_CCOEFF_NORMED)
+            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+
+            print(f"Match value: {max_val:.2f} (need {threshold})")
+
+            if max_val >= threshold:
+                y, x = max_loc
+                center_x = x + template.shape[1] // 2
+                center_y = y + template.shape[0] // 2
+                print(f"Found at ({center_x}, {center_y})")
+                return (center_x, center_y)
+            print("Not found")
             return None
         except Exception as e:
-            print(f"Template search error: {str(e)}")
+            print(f"Search error: {str(e)}")
+            traceback.print_exc()
             return None
 
     def safe_click(x, y, duration=0.2):
         try:
+            print(f"Clicking ({x}, {y})")
             pyautogui.moveTo(x, y, duration=duration)
             pyautogui.click()
             return True
         except Exception as e:
-            print(f"Click error: {str(e)}")
+            print(f"Click failed: {str(e)}")
             return False
 
-    def process_step(template_name, action, attempts=max_attempts):
-        for attempt in range(attempts):
-            pos = find_template(template_name)
+    def process_step(name, action, attempts=5):
+        print(f"\n-- Processing {name} --")
+        for attempt in range(1, attempts + 1):
+            print(f"Attempt {attempt}/{attempts}")
+            pos = find_template(name)
             if pos:
+                print("Executing action")
                 if action(pos):
+                    print("Action success")
                     return True
-            time.sleep(attempt_interval)
+                print("Action failed")
+            time.sleep(10)
+        print("All attempts failed")
         return False
 
     try:
+        print("\nChecking settings...")
+        settings_path = os.path.join(os.path.dirname(__file__), '..', 'settings.json')
+        if os.path.exists(settings_path):
+            with open(settings_path, "r") as f:
+                settings = json.load(f)
+                print("Settings loaded")
+        else:
+            print("No settings file")
+
         while True:
             try:
-                if process_step("DostupKoleso", lambda pos: (
+                print("\n" + "-" * 30)
+                print(f"New cycle {datetime.now().strftime('%H:%M:%S')}")
 
+                if process_step("DostupKoleso", lambda pos: (
                         time.sleep(65),
                         pyautogui.press('up')
                 )):
@@ -116,54 +172,49 @@ def run_koleso(
                             break
 
                     if process_step("ButtonKoloso", lambda pos: safe_click(*pos)):
-                        if process_step("ResultKoleso",
-                                      lambda pos: True,
-                                      attempts=result_check_attempts):
-                            time.sleep(3)
+                        if process_step("ResultKoleso", lambda pos: True, 15):
                             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                             os.makedirs(screenshot_dir, exist_ok=True)
-                            screenshot_path = os.path.join(screenshot_dir, f"{timestamp}_koleso.png")
+                            path = os.path.join(screenshot_dir, f"koleso_{timestamp}.png")
 
                             try:
-                                pyautogui.screenshot(screenshot_path)
-                                if telegram_enabled:
-                                    try:
-                                        if send_screenshot_to_telegram(screenshot_path, caption="С колеса удачи выпало:"):
-                                            os.remove(screenshot_path)
-                                    except Exception as tg_error:
-                                        print(f"Telegram error: {str(tg_error)}")
-                            except Exception as screenshot_error:
-                                print(f"Screenshot error: {str(screenshot_error)}")
+                                pyautogui.screenshot(path)
+                                print(f"Screenshot saved: {path}")
 
+                                if send_screenshot_to_telegram(path, "Koleso result"):
+                                    print("Telegram sent")
+                                    os.remove(path)
+                                else:
+                                    print("Telegram failed")
+                            except Exception as e:
+                                print(f"Screenshot error: {str(e)}")
+
+                        print("Resetting...")
                         time.sleep(20)
                         pyautogui.press('esc')
-                        time.sleep(1)
                         pyautogui.press('esc')
                         pyautogui.press('backspace')
 
+                print(f"Waiting {check_interval}s")
                 time.sleep(check_interval)
 
             except KeyboardInterrupt:
-                print("Interrupted by user")
+                print("Stopped by user")
                 break
 
             except Exception as e:
-                print(f"Main loop error: {str(e)}")
-                time.sleep(attempt_interval)
+                print(f"Cycle error: {str(e)}")
+                traceback.print_exc()
+                time.sleep(10)
 
     finally:
-        print("Koleso service stopped")
+        print("\n" + "=" * 40)
+        print(f"[{datetime.now()}] Service stopped")
+        print("=" * 40)
+
 
 if __name__ == "__main__":
-    try:
-        if any("--service=koleso" in arg for arg in sys.argv):
-            run_koleso(
-                thresholds=0.9,
-                check_interval=1,
-                result_check_attempts=15
-            )
-        else:
-            print("Для запуска сервиса используйте флаг --service=koleso")
-    except Exception as e:
-        print(f"Fatal error: {str(e)}")
-        traceback.print_exc()
+    if "--service=koleso" in sys.argv:
+        run_koleso()
+    else:
+        print("Use --service=koleso to start")

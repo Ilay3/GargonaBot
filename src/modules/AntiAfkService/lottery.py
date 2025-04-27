@@ -18,22 +18,25 @@ pyautogui.FAILSAFE = False
 
 
 def load_templates():
-    """Загрузка шаблонов изображений с расширенным логированием"""
+    """Загрузка шаблонов изображений с корректными путями"""
     templates = {}
     try:
-        print("[DEBUG][lottery] Determining base directory...")
-        base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
-        print(f"[DEBUG][lottery] Base directory: {base_dir}")
+        # Определяем базовый путь в зависимости от окружения
+        if getattr(sys, 'frozen', False):
+            # Для EXE: путь к распакованным ресурсам
+            base_dir = sys._MEIPASS
+            resources_path = os.path.join(base_dir, 'resources', 'images', 'ImgLottery')
+        else:
+            # Для разработки: поднимаемся на 3 уровня выше от AntiAfkService
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            resources_path = os.path.join(base_dir, 'resources', 'images', 'ImgLottery')
 
-        # Стало:
-        resources_path = os.path.join(base_dir, 'resources', 'images', 'ImgLottery')
-        print(f"[DEBUG][lottery] Computed resources path: {resources_path}")
+        print(f"[DEBUG][lottery] Final resources path: {resources_path}")
 
         if not os.path.exists(resources_path):
-            print(f"[ERROR][lottery] Resources directory not found at: {resources_path}")
-            return None
+            raise FileNotFoundError(f"Resources directory not found: {resources_path}")
 
-        print("[DEBUG][lottery] Loading template files...")
+        # Остальной код загрузки шаблонов без изменений
         template_files = {
             "Iconlottery": "Iconlottery.png",
             "Buttonlottery": "Buttonlottery.png",
@@ -43,19 +46,10 @@ def load_templates():
 
         for name, filename in template_files.items():
             full_path = os.path.join(resources_path, filename)
-            print(f"[DEBUG][lottery] Attempting to load: {full_path}")
-
-            if not os.path.isfile(full_path):
-                print(f"[ERROR][lottery] Template file missing: {full_path}")
-                continue
-
             img = cv2.imread(full_path, 0)
             if img is None:
-                print(f"[ERROR][lottery] Failed to read image: {full_path}")
-                continue
-
+                raise ValueError(f"Failed to load image: {full_path}")
             templates[name] = img
-            print(f"[DEBUG][lottery] Successfully loaded {name} ({img.shape[1]}x{img.shape[0]})")
 
         return templates
 
@@ -63,7 +57,6 @@ def load_templates():
         print(f"[CRITICAL][lottery] Load templates failed: {str(e)}")
         traceback.print_exc()
         return None
-
 
 def find_template(template, threshold=0.9):
     """Поиск шаблона с логированием"""
@@ -214,4 +207,4 @@ if __name__ == "__main__":
     if "--service" in sys.argv:
         run_lottery_service()
     else:
-        print("[ERROR][lottery] Use --service flag to start")
+        print("Для запуска сервиса используйте флаг --service")

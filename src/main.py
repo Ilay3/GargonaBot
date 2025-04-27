@@ -207,7 +207,7 @@ def run_service_mode():
                 run_koleso(
                     thresholds=0.9,
                     check_interval=1,
-                    telegram_enabled=True
+
                 )
                 sys.exit(0)
             elif service_name == "demorgan":
@@ -498,6 +498,98 @@ class MainWindow(QMainWindow):
         self.license_timer.timeout.connect(self.update_license_label)
         self.license_timer.start(1000)
 
+    def closeEvent(self, event):
+        """Вызывается при закрытии окна"""
+        self.kill_all_bots()
+        event.accept()
+
+    def kill_all_bots(self):
+        """Принудительное завершение всех процессов"""
+        for name in list(self.processes.keys()):
+            proc = self.processes[name]
+            if proc is not None:
+                try:
+                    # Для Windows
+                    if os.name == 'nt':
+                        subprocess.run(
+                            ['taskkill', '/F', '/T', '/PID', str(proc.pid)],
+                            shell=True,
+                            check=True,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL
+                        )
+
+
+
+                    if proc.poll() is None:
+                        proc.wait(timeout=5)
+
+                except Exception as e:
+                    print(f"Ошибка при остановке {name}: {e}")
+                    traceback.print_exc()
+                finally:
+                    self.processes[name] = None
+
+        # Сброс всех кнопок в исходное состояние
+        self.antiafk_button.setText("Запустить Anti-AFK")
+        self.antiafk_button.setStyleSheet("font-size: 16px; padding: 10px;")
+
+        self.chk_koleso.setChecked(False)
+        self.chk_lottery.setChecked(False)
+        self.chk_myservice.setChecked(False)
+
+        self.waxta_button.setText("Запустить работу на Шахте")
+        self.waxta_button.setStyleSheet("font-size: 16px; padding: 10px;")
+
+        self.port_button.setText("Запустить работу в Порту")
+        self.port_button.setStyleSheet("font-size: 16px; padding: 10px;")
+
+        self.stroyka_button.setText("Запустить работу на Стройке")
+        self.stroyka_button.setStyleSheet("font-size: 16px; padding: 10px;")
+
+        self.kozlodoy_button.setText("Запустить работу на Ферме")
+        self.kozlodoy_button.setStyleSheet("font-size: 16px; padding: 10px;")
+
+        self.taxi_button.setText("Запустить работу в Такси")
+        self.taxi_button.setStyleSheet("font-size: 16px; padding: 10px;")
+
+        self.chk_autorun.setChecked(False)
+
+        self.cook_button.setText("Запустить")
+        self.cook_button.setStyleSheet("font-size: 16px; padding: 10px;")
+        self.cook_error_label.setText("")
+
+        self.kosyaki_button.setText("Запустить создание Косяков")
+        self.kosyaki_button.setStyleSheet("font-size: 16px; padding: 10px;")
+
+        self.automood_launch_button.setText("Запустить Авто-Настроение")
+        self.automood_launch_button.setStyleSheet("font-size: 16px; padding: 10px;")
+
+        self.autorun_launch_button.setText("Запустить Авто-Бег")
+        self.autorun_launch_button.setStyleSheet("font-size: 16px; padding: 10px;")
+
+        self.autoeat_launch_button.setText("Запустить Авто-Еда")
+        self.autoeat_launch_button.setStyleSheet("font-size: 16px; padding: 10px;")
+
+        self.kachalka_launch_button.setText("Запустить тренировку в спортзале")
+        self.kachalka_launch_button.setStyleSheet("font-size: 16px; padding: 10px;")
+
+        self.shveika_button.setText("Запустить Швейную фабрику")
+        self.shveika_button.setStyleSheet("font-size: 16px; padding: 10px;")
+
+        self.skolzkaya_button.setText("Запустить Скользкая дорога")
+        self.skolzkaya_button.setStyleSheet("font-size: 16px; padding: 10px;")
+
+        self.schems_button.setText("Запустить Схемы")
+        self.schems_button.setStyleSheet("font-size: 16px; padding: 10px;")
+
+        self.demorgan_button.setText("Запустить Пошив Формы")
+        self.demorgan_button.setStyleSheet("font-size: 16px; padding: 10px;")
+
+        self.tochilka_button.setText("Запустить Точилку")
+        self.tochilka_button.setStyleSheet("font-size: 16px; padding: 10px;")
+
+        print("Все процессы остановлены, интерфейс сброшен")
     def create_home_page(self):
         widget = QWidget()
         layout = QVBoxLayout(widget)
@@ -1153,74 +1245,75 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 print("Ошибка при остановке antiafk:", e)
 
-
-
     def toggle_koleso(self, checked):
-        print(f"Toggle koleso: {checked}")  # <-- Добавлено
-        if checked:
-            python_executable = sys.executable
-            script_path = sys.argv[0]
-            log_args = [python_executable, script_path, "--service=koleso"]
-            print(f"Попытка запуска процесса с аргументами: {log_args}")  # <-- Добавлено
-
-            try:
-                self.processes["koleso"] = subprocess.Popen(
-                    [python_executable, script_path, "--service=koleso"],
-                    creationflags=subprocess.CREATE_NO_WINDOW,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    bufsize=1,
-                    universal_newlines=True,
-                    env={**os.environ, 'PYTHONIOENCODING': 'utf-8'}
-                )
-                print(f"Процесс запущен, PID: {self.processes['koleso'].pid}")
-
-                # Запустите отдельный поток для логирования вывода
-                def log_output(process, name):
-                    while True:
-                        output = process.stdout.readline()
-                        if not output and process.poll() is not None:
-                            break
-                        if output:
-                            print(f"[{name}]: {output.decode().strip()}")
-
-                threading.Thread(
-                    target=log_output,
-                    args=(self.processes["koleso"], "koleso"),
-                    daemon=True
-                ).start()
-
-            except Exception as e:
-                print(f"Ошибка запуска: {traceback.format_exc()}")  # <-- Добавлен traceback
-
+        print(f"[DEBUG] Toggle koleso: {checked}")
+        try:
+            if checked:
+                if self.processes["koleso"] is None:
+                    command = [
+                        sys.executable,
+                        sys.argv[0],
+                        "--service=koleso"
+                    ]
+                    self.processes["koleso"] = subprocess.Popen(
+                        command,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        encoding='utf-8',
+                        cwd=os.path.dirname(os.path.abspath(__file__)),  # Добавлен рабочий каталог
+                        creationflags=subprocess.CREATE_NO_WINDOW
+                    )
+                    # Блокируем сигналы при изменении состояния
+                    self.chk_koleso.blockSignals(True)
+                    self.chk_koleso.setChecked(True)
+                    self.chk_koleso.blockSignals(False)
+                    threading.Thread(
+                        target=self.log_subprocess_output,
+                        args=(self.processes["koleso"], "koleso"),
+                        daemon=True
+                    ).start()
+            else:
+                if self.processes["koleso"] is not None:
+                    self.processes["koleso"].terminate()
+                    self.processes["koleso"] = None
+                    # Блокируем сигналы при изменении состояния
+                    self.chk_koleso.blockSignals(True)
+                    self.chk_koleso.setChecked(False)
+                    self.chk_koleso.blockSignals(False)
+        except Exception as e:
+            print(f"[ERROR] Koleso error: {str(e)}")
+            traceback.print_exc()
     def toggle_lottery(self, checked):
-        print(f"[DEBUG][main2] Toggle lottery called. Checked: {checked}")
-        if self.processes["lottery"] is None:
-            python_executable = sys.executable
-            script_path = sys.argv[0]
-            print(f"[DEBUG][main2] Launching process. Python: {python_executable}")
-            print(f"[DEBUG][main2] Script path: {script_path}")
-
-            try:
-                self.processes["lottery"] = subprocess.Popen(
-                    [python_executable, script_path, "--service=lottery"],
-                    creationflags=subprocess.CREATE_NO_WINDOW,
-                    stdout=subprocess.PIPE,  # Capture output
-                    stderr=subprocess.PIPE,
-                    text=True
-                )
-                print(f"[DEBUG][main2] Process started. PID: {self.processes['lottery'].pid}")
-
-                # Start thread to read outputs
-                threading.Thread(target=self.log_subprocess_output,
-                                 args=(self.processes["lottery"], "lottery")).start()
-
-            except Exception as e:
-                print(f"[ERROR][main2] Process start failed: {str(e)}")
-                traceback.print_exc()
+        print(f"[DEBUG] Toggle lottery: {checked}")
+        if checked:
+            if self.processes["lottery"] is None:
+                try:
+                    command = [sys.executable, sys.argv[0], "--service=lottery"]
+                    self.processes["lottery"] = subprocess.Popen(
+                        command,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        encoding='utf-8'
+                    )
+                    self.chk_lottery.setChecked(True)  # Обновляем состояние чекбокса
+                    threading.Thread(
+                        target=self.log_subprocess_output,
+                        args=(self.processes["lottery"], "lottery"),
+                        daemon=True
+                    ).start()
+                except Exception as e:
+                    print(f"[ERROR] Failed to start lottery: {str(e)}")
+                    self.chk_lottery.setChecked(False)
         else:
-            print("[DEBUG][main2] Stopping process...")
-            # Добавьте аналогичное логирование для остановки
+            if self.processes["lottery"] is not None:
+                try:
+                    self.processes["lottery"].terminate()
+                    self.processes["lottery"] = None
+                    self.chk_lottery.setChecked(False)  # Обновляем состояние чекбокса
+                except Exception as e:
+                    print(f"[ERROR] Failed to stop lottery: {str(e)}")
 
     def log_subprocess_output(self, process, name):
         while True:
@@ -1848,14 +1941,30 @@ def run_telegram_bot():
             else:
                 update.message.reply_text("Ошибка при создании скриншота")
 
+
         elif text == "Авто-колесо":
-            window.toggle_koleso(not window.chk_koleso.isChecked())
-            status = "запущено" if window.chk_koleso.isChecked() else "остановлено"
+
+            current_state = window.chk_koleso.isChecked()
+
+            window.toggle_koleso(not current_state)
+
+            new_state = window.chk_koleso.isChecked()  # Получаем актуальное состояние
+
+            status = "запущено" if new_state else "остановлено"
+
             update.message.reply_text(f"Авто-колесо: {status}")
 
+
         elif text == "Лотерея":
-            window.toggle_lottery(not window.chk_lottery.isChecked())
-            status = "запущена" if window.chk_lottery.isChecked() else "остановлена"
+
+            current_state = window.chk_lottery.isChecked()
+
+            window.toggle_lottery(not current_state)
+
+            new_state = window.chk_lottery.isChecked()
+
+            status = "запущена" if new_state else "остановлена"
+
             update.message.reply_text(f"Лотерея: {status}")
 
         elif text == "Реконнект":
