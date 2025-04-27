@@ -227,9 +227,10 @@ def run_service_mode():
 
 if any(arg.startswith("--service=") for arg in sys.argv[1:]):
     run_service_mode()
-from telegram import Update, ParseMode, KeyboardButton, ReplyKeyboardMarkup
-from telegram.ext import CommandHandler, CallbackContext, MessageHandler, Filters, Updater
-
+from telegram import Update,  KeyboardButton, ReplyKeyboardMarkup
+from telegram.ext import CommandHandler, CallbackContext, MessageHandler, Updater
+from telegram.constants import ParseMode
+from telegram.ext import filters as Filters
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
@@ -282,8 +283,8 @@ elif os.path.isdir(os.path.join(BASE_DIR, "src", "modules")):
 else:
     raise FileNotFoundError("Не найдена папка modules")
 
-sys.path.append(os.path.join(MODULES_BASE, "ProcessChecker"))
-import process_checker
+
+from modules.ProcessChecker import process_checker
 
 # Пути к скриптам
 ANTIAFK_PATH     = os.path.join(MODULES_BASE, "AntiAfkService", "antiafk.py")
