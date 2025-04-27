@@ -128,7 +128,7 @@ def run_koleso(
                                 pyautogui.screenshot(screenshot_path)
                                 if telegram_enabled:
                                     try:
-                                        if send_screenshot_to_telegram(screenshot_path):
+                                        if send_screenshot_to_telegram(screenshot_path, caption="С колеса удачи выпало:"):
                                             os.remove(screenshot_path)
                                     except Exception as tg_error:
                                         print(f"Telegram error: {str(tg_error)}")
