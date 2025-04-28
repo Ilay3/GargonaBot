@@ -1074,7 +1074,7 @@ class MainWindow(QMainWindow):
             if not screenshot_path:
                 return False
 
-            if send_screenshot_to_telegram(screenshot_path, "Custom Screenshot"):
+            if send_screenshot_to_telegram(screenshot_path):
                 os.remove(screenshot_path)
                 print("Custom screenshot sent and deleted")
                 return True
