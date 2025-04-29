@@ -12,157 +12,135 @@ import json
 sys.stdout = sys.__stdout__
 sys.stderr = sys.__stderr__
 
-def get_base_path():
-    """Возвращает корректный путь к ресурсам для EXE и исходного кода"""
-    if getattr(sys, 'frozen', False):
-        # Путь при запуске из EXE
-        return sys._MEIPASS
-    else:
-        # Путь при запуске из исходного кода
-        return os.path.dirname(os.path.abspath(__file__))
-def send_screenshot_to_telegram(screenshot_path, message=None):
-    try:
-        from main import send_screenshot_to_telegram as _send
-        return _send(screenshot_path, message)
-    except ImportError:
-        return False
-    except Exception as e:
-        print(f"Telegram error: {str(e)}")
-        return False
 
 
-def run_koleso(
-        thresholds=0.9,
-        check_interval=1,
-        screenshot_dir="screenshots",
-        result_check_attempts=10
-):
-    print("\n" + "=" * 40)
-    print(f"[{datetime.now()}] Starting Koleso service")
-    print(f"Threshold: {thresholds}")
-    print(f"Check interval: {check_interval}s")
+
+
+
+
+
+def run_koleso(threshold=0.75, check_interval=1, screenshot_dir="screenshots", result_check_attempts=10):
     print("=" * 40)
+    print("Запуск Koleso сервиса")
+    print(f"Threshold: {threshold}")
+    print(f"Check interval: {check_interval}")
+    print("=" * 40)
+    # Добавляем путь к корню проекта для корректного импорта
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+    # Инициализируем переменную telegram_enabled
+    telegram_enabled = False  # <-- Добавлено здесь
+
+    try:
+        from main import send_screenshot_to_telegram
+        telegram_enabled = True  # <-- Устанавливаем True при успешном импорте
+    except ImportError:
+        telegram_enabled = False
+        print("Telegram интеграция отключена")
+    except Exception as e:
+        print(f"Ошибка импорта Telegram: {str(e)}")
+        telegram_enabled = False
     if platform.system() != "Windows":
         print("Windows required!")
         return
 
-    # Проверка прав записи
-    try:
-        test_file = os.path.join(screenshot_dir, "test_koleso.txt")
-        with open(test_file, "w") as f:
-            f.write("test")
-        os.remove(test_file)
-        print("Write test: OK")
-    except Exception as e:
-        print(f"Write error: {str(e)}")
-        return
-
     pyautogui.FAILSAFE = False
-    templates = {}
 
     def load_templates():
-        print("\nLoading templates...")
-        base_dir = get_base_path()
-        resources_path = os.path.join(
-            base_dir,
-            'resources',
-            'images',
-            'ImgKoleso'
-        )
-
-        print(f"Resource path: {resources_path}")
-
-        template_files = {
-            "DostupKoleso": "DostupKoleso.png",
-            "IconCasino": "IconCasino.png",
-            "InterfaceKolesa": "InterfaceKolesa.png",
-            "ButtonKoloso": "ButtonKoloso.png",
-            "ResultKoleso": "ResultKoleso.png"
-        }
-
-        for name, filename in template_files.items():
-            path = os.path.join(resources_path, filename)
-            print(f"Loading: {path}")
-
-            if not os.path.exists(path):
-                print(f"File not found: {path}")
-                return False
-
-            img = cv2.imread(path, 0)
-            if img is not None:
-                templates[name] = img
-                print(f"Loaded {name} ({img.shape[1]}x{img.shape[0]})")
-            else:
-                print(f"Failed to load: {filename}")
-                return False
-        return True
-
-    def find_template(template_name, threshold=thresholds):
+        """Загрузка шаблонов изображений с корректными путями для krutkakoles"""
         try:
-            print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Searching: {template_name}")
+            if getattr(sys, 'frozen', False):
+                base_dir = sys._MEIPASS
+                resources_path = os.path.join(base_dir, 'resources', 'images', 'ImgKoleso')
+            else:
+                base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+                resources_path = os.path.join(base_dir, 'resources', 'images', 'ImgKoleso')
+
+            print(f"[DEBUG] Resources path: {resources_path}")
+
+            if not os.path.exists(resources_path):
+                raise FileNotFoundError(f"Resources directory not found: {resources_path}")
+
+            template_files = {
+                "DostupKoleso": "DostupKoleso.png",
+                "IconCasino": "IconCasino.png",
+                "InterfaceKolesa": "InterfaceKolesa.png",
+                "ButtonKoloso": "ButtonKoloso.png",
+                "ResultKoleso": "ResultKoleso.png"
+            }
+
+            loaded_templates = {}
+            for name, filename in template_files.items():
+                full_path = os.path.join(resources_path, filename)
+                print(f"Загрузка шаблона {name} из {full_path}")
+                img = cv2.imread(full_path, 0)
+                if img is None:
+                    print(f"[ERROR] Не удалось загрузить: {full_path}")
+                    raise FileNotFoundError(f"Image not found: {full_path}")
+                loaded_templates[name] = img
+                print(f"Шаблон {name} загружен")
+
+            return loaded_templates
+        except Exception as e:
+            print(f"Ошибка загрузки шаблонов: {str(e)}")
+            traceback.print_exc()
+            return None
+
+    templates = load_templates()
+    if not templates:
+        print("Не удалось загрузить шаблоны. Выход.")
+        return
+
+    def find_template(template_name, threshold=threshold):
+        try:
+            print(f"Поиск шаблона: {template_name}")
+            if template_name not in templates:
+                print(f"Шаблон {template_name} не найден в словаре")
+                return None
+
             template = templates[template_name]
             screenshot = pyautogui.screenshot()
             gray = cv2.cvtColor(np.array(screenshot), cv2.COLOR_BGR2GRAY)
 
             res = cv2.matchTemplate(gray, template, cv2.TM_CCOEFF_NORMED)
-            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+            _, max_val, _, max_loc = cv2.minMaxLoc(res)
 
-            print(f"Match value: {max_val:.2f} (need {threshold})")
-
+            print(f"Совпадение: {max_val:.2f} (требуется >= {threshold})")
             if max_val >= threshold:
-                y, x = max_loc
+                x, y = max_loc
                 center_x = x + template.shape[1] // 2
                 center_y = y + template.shape[0] // 2
-                print(f"Found at ({center_x}, {center_y})")
+                print(f"Найдено: ({center_x}, {center_y})")
                 return (center_x, center_y)
-            print("Not found")
+            print("Шаблон не найден")
             return None
         except Exception as e:
-            print(f"Search error: {str(e)}")
+            print(f"Ошибка поиска шаблона: {str(e)}")
             traceback.print_exc()
             return None
 
     def safe_click(x, y, duration=0.2):
         try:
-            print(f"Clicking ({x}, {y})")
+            print(f"Клик по ({x}, {y})")
             pyautogui.moveTo(x, y, duration=duration)
             pyautogui.click()
             return True
         except Exception as e:
-            print(f"Click failed: {str(e)}")
+            print(f"Ошибка клика: {str(e)}")
             return False
 
-    def process_step(name, action, attempts=5):
-        print(f"\n-- Processing {name} --")
-        for attempt in range(1, attempts + 1):
-            print(f"Attempt {attempt}/{attempts}")
-            pos = find_template(name)
+    def process_step(template_name, action, attempts=5):
+        for attempt in range(attempts):
+            pos = find_template(template_name)
             if pos:
-                print("Executing action")
                 if action(pos):
-                    print("Action success")
                     return True
-                print("Action failed")
-            time.sleep(10)
-        print("All attempts failed")
+            time.sleep(5)
         return False
 
     try:
-        print("\nChecking settings...")
-        settings_path = os.path.join(os.path.dirname(__file__), '..', 'settings.json')
-        if os.path.exists(settings_path):
-            with open(settings_path, "r") as f:
-                settings = json.load(f)
-                print("Settings loaded")
-        else:
-            print("No settings file")
-
         while True:
             try:
-                print("\n" + "-" * 30)
-                print(f"New cycle {datetime.now().strftime('%H:%M:%S')}")
-
                 if process_step("DostupKoleso", lambda pos: (
                         time.sleep(65),
                         pyautogui.press('up')
@@ -172,49 +150,85 @@ def run_koleso(
                             break
 
                     if process_step("ButtonKoloso", lambda pos: safe_click(*pos)):
-                        if process_step("ResultKoleso", lambda pos: True, 15):
+                        if process_step("ResultKoleso",
+                                        lambda pos: True,
+                                        attempts=result_check_attempts):
+                            # Добавляем задержку для стабилизации интерфейса
+                            time.sleep(3)
+
+                            # Создаем папку с абсолютным путем
+                            screenshot_dir_abs = os.path.abspath(screenshot_dir)
+                            os.makedirs(screenshot_dir_abs, exist_ok=True)
+
                             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-                            os.makedirs(screenshot_dir, exist_ok=True)
-                            path = os.path.join(screenshot_dir, f"koleso_{timestamp}.png")
+                            screenshot_path = os.path.join(
+                                screenshot_dir_abs,
+                                f"koleso_{timestamp}.png"
+                            )
 
                             try:
-                                pyautogui.screenshot(path)
-                                print(f"Screenshot saved: {path}")
+                                # Делаем скриншот с проверкой
+                                pyautogui.screenshot(screenshot_path)
+                                print(f"Скриншот сохранен: {screenshot_path}")
 
-                                if send_screenshot_to_telegram(path, "Koleso result"):
-                                    print("Telegram sent")
-                                    os.remove(path)
-                                else:
-                                    print("Telegram failed")
-                            except Exception as e:
-                                print(f"Screenshot error: {str(e)}")
+                                if telegram_enabled:
+                                    # Проверяем существование файла перед отправкой
+                                    if os.path.exists(screenshot_path):
+                                        print(f"Размер файла: {os.path.getsize(screenshot_path) / 1024:.2f} KB")
 
-                        print("Resetting...")
-                        time.sleep(20)
-                        pyautogui.press('esc')
-                        pyautogui.press('esc')
-                        pyautogui.press('backspace')
+                                        # Пытаемся отправить с повторными попытками
+                                        success = False
+                                        for retry in range(3):
+                                            try:
+                                                success = send_screenshot_to_telegram(
+                                                    screenshot_path,
+                                                    caption="Результат колеса удачи:"
+                                                )
+                                                if success: break
+                                                time.sleep(2)
+                                            except Exception as tg_error:
+                                                print(f"Ошибка Telegram (попытка {retry + 1}): {str(tg_error)}")
 
-                print(f"Waiting {check_interval}s")
+                                        # Удаляем только при успешной отправке
+                                        if success:
+                                            print("Успешно отправлено, удаляю файл")
+                                            os.remove(screenshot_path)
+                                        else:
+                                            print("Не удалось отправить, оставляю файл")
+                                            error_path = os.path.join(
+                                                screenshot_dir_abs,
+                                                f"ERROR_{timestamp}.png"
+                                            )
+                                            os.rename(screenshot_path, error_path)
+                                    else:
+                                        print("Ошибка: скриншот не создан!")
+
+                            except Exception as screenshot_error:
+                                print(f"Ошибка создания скриншота: {str(screenshot_error)}")
+                                traceback.print_exc()
+
+                            time.sleep(20)
+                            pyautogui.press('esc')
+                            time.sleep(1)
+                            pyautogui.press('esc')
+                            pyautogui.press('backspace')
+
                 time.sleep(check_interval)
 
             except KeyboardInterrupt:
-                print("Stopped by user")
+                print("Остановлено пользователем")
                 break
 
             except Exception as e:
-                print(f"Cycle error: {str(e)}")
+                print(f"Ошибка в основном цикле: {str(e)}")
                 traceback.print_exc()
-                time.sleep(10)
+                time.sleep(5)
 
     finally:
-        print("\n" + "=" * 40)
-        print(f"[{datetime.now()}] Service stopped")
-        print("=" * 40)
-
+        print("Сервис колеса остановлен")
 
 if __name__ == "__main__":
     if "--service=koleso" in sys.argv:
         run_koleso()
     else:
-        print("Use --service=koleso to start")
+        print("Привет")

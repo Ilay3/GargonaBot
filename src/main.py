@@ -44,45 +44,55 @@ def authenticate():
 
 PYTHON_EXEC = sys.executable
 
-def send_screenshot_to_telegram(screenshot_path, message=None):
-    """
-    Загружает настройки из settings.json, отправляет скриншот в Telegram (через sendPhoto)
-    и возвращает True, если отправка успешна.
-    """
-    # Определяем корневую папку проекта
-    settings_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "settings.json"))
-    print(f"Using settings path: {settings_path}")
+
+def send_screenshot_to_telegram(screenshot_path, message=None,caption=None):
+    from datetime import datetime
+    print(f"\n[Telegram] Начало отправки: {datetime.now().isoformat()}")
+    print(f"[Telegram] Проверка файла: {screenshot_path}")
+
     try:
-        with open(settings_path, "r", encoding="utf-8") as f:
-            settings = json.load(f)
-    except Exception as e:
-        print(f"Ошибка загрузки настроек из {settings_path}: {e}")
-        return False
-
-    token = settings.get("telegram_token", "")
-    chat_id = settings.get("telegram_chat_id", "")
-    if not token or not chat_id:
-        print("telegram_token или telegram_chat_id не заданы в настройках.")
-        return False
-
-    url = f"https://api.telegram.org/bot{token}/sendPhoto"
-    try:
-        with open(screenshot_path, "rb") as photo:
-            data = {"chat_id": chat_id}
-            if message:
-                data["caption"] = message  # <-- добавляем текст
-
-            response = requests.post(url, data=data, files={"photo": photo})
-        if response.status_code == 200:
-            print("Скриншот успешно отправлен в Telegram.")
-            return True
-        else:
-            print(f"Ошибка отправки скриншота: {response.text}")
+        if not os.path.exists(screenshot_path):
+            print(f"[ERROR] Файл не существует: {screenshot_path}")
             return False
-    except Exception as e:
-        print(f"Исключение при отправке скриншота: {e}")
-        return False
+        print(f"\n[Telegram] Попытка отправки: {os.path.basename(screenshot_path)}")
+        print(f"[Telegram] Абсолютный путь: {os.path.abspath(screenshot_path)}")
+        print(f"[Telegram] Файл существует: {os.path.exists(screenshot_path)}")
+        print(f"[Telegram] Размер файла: {os.path.getsize(screenshot_path)} bytes")
 
+        # Загрузка настроек
+        settings_path = os.path.join(os.path.dirname(__file__), '..', 'settings.json')
+        print(f"[Telegram] Путь к настройкам: {settings_path}")
+
+        with open(settings_path, "r") as f:
+            settings = json.load(f)
+
+        token = settings.get("telegram_token")
+        chat_id = settings.get("telegram_chat_id")
+
+        if not token or not chat_id:
+            print("[ERROR] Отсутствуют токен или chat_id")
+            return False
+
+        print(f"[Telegram] Используется токен: {token[:3]}...{token[-2:]}")
+        print(f"[Telegram] Используется chat_id: {chat_id}")
+
+        # Отправка запроса
+        url = f"https://api.telegram.org/bot{token}/sendPhoto"
+        files = {'photo': open(screenshot_path, 'rb')}
+        data = {'chat_id': chat_id, 'caption': message}
+
+        print(f"[Telegram] Отправка запроса: {url}")
+        response = requests.post(url, files=files, data=data, timeout=10)
+
+        print(f"[Telegram] Ответ сервера: {response.status_code}")
+        print(f"[Telegram] Содержимое ответа: {response.text}")
+
+        return response.status_code == 200
+
+    except Exception as e:
+        print(f"[Telegram ERROR] {str(e)}")
+        traceback.print_exc()
+        return False
 
 
 def run_service_mode():
@@ -204,11 +214,7 @@ def run_service_mode():
                 sys.exit(0)
             elif service_name == "koleso":
                 from modules.AntiAfkService.krutkakoles import run_koleso
-                run_koleso(
-                    thresholds=0.9,
-                    check_interval=1,
-
-                )
+                run_koleso()
                 sys.exit(0)
             elif service_name == "demorgan":
                 from modules.TuragaService.ShveiaDemorgan import run_shveia_demorgan
@@ -372,15 +378,7 @@ def save_license(key, expiry_date):
 
 
 class MainWindow(QMainWindow):
-    def log_subprocess_output(self, process, service_name):
-        while process.poll() is None:
-            output = process.stdout.readline()
-            if output:
-                print(f"[{service_name}] {output.strip()}", "debug")
-        print(f"Процесс {service_name} завершился", "info")
 
-        self.inactive_counter = 0
-        self.bots_killed_due_to_inactivity = False
     def __init__(self):
         super().__init__()
         self.launch_game_button = None
@@ -1255,32 +1253,56 @@ class MainWindow(QMainWindow):
                         sys.argv[0],
                         "--service=koleso"
                     ]
+
+                    # Запускаем процесс с перенаправлением вывода
                     self.processes["koleso"] = subprocess.Popen(
                         command,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.STDOUT,
                         text=True,
                         encoding='utf-8',
-                        cwd=os.path.dirname(os.path.abspath(__file__)),  # Добавлен рабочий каталог
-                        creationflags=subprocess.CREATE_NO_WINDOW
+                        bufsize=1,  # Строковая буферизация
+                        cwd=os.path.dirname(os.path.abspath(__file__)),
                     )
-                    # Блокируем сигналы при изменении состояния
-                    self.chk_koleso.blockSignals(True)
-                    self.chk_koleso.setChecked(True)
-                    self.chk_koleso.blockSignals(False)
+
+                    # Создаем поток для чтения вывода
+                    def output_reader(process, service_name):
+                        while True:
+                            output = process.stdout.readline()
+                            if output == '' and process.poll() is not None:
+                                break
+                            if output:
+                                print(f"[{service_name}] {output.strip()}")
+
+                        # После завершения процесса
+                        self.processes["koleso"] = None
+                        self.chk_koleso.blockSignals(True)
+                        self.chk_koleso.setChecked(False)
+                        self.chk_koleso.blockSignals(False)
+
+                    # Запускаем поток чтения вывода
                     threading.Thread(
-                        target=self.log_subprocess_output,
+                        target=output_reader,
                         args=(self.processes["koleso"], "koleso"),
                         daemon=True
                     ).start()
+
+                    # Обновляем UI
+                    self.chk_koleso.blockSignals(True)
+                    self.chk_koleso.setChecked(True)
+                    self.chk_koleso.blockSignals(False)
+
             else:
                 if self.processes["koleso"] is not None:
+                    # Завершаем процесс
                     self.processes["koleso"].terminate()
                     self.processes["koleso"] = None
-                    # Блокируем сигналы при изменении состояния
+
+                    # Обновляем UI
                     self.chk_koleso.blockSignals(True)
                     self.chk_koleso.setChecked(False)
                     self.chk_koleso.blockSignals(False)
+
         except Exception as e:
             print(f"[ERROR] Koleso error: {str(e)}")
             traceback.print_exc()
@@ -1299,7 +1321,7 @@ class MainWindow(QMainWindow):
                     )
                     self.chk_lottery.setChecked(True)  # Обновляем состояние чекбокса
                     threading.Thread(
-                        target=self.log_subprocess_output,
+
                         args=(self.processes["lottery"], "lottery"),
                         daemon=True
                     ).start()
@@ -1315,15 +1337,7 @@ class MainWindow(QMainWindow):
                 except Exception as e:
                     print(f"[ERROR] Failed to stop lottery: {str(e)}")
 
-    def log_subprocess_output(self, process, name):
-        while True:
-            output = process.stdout.readline()
-            if output == '' and process.poll() is not None:
-                break
-            if output:
-                print(f"[SUBPROCESS {name}] {output.strip()}")
-        rc = process.poll()
-        print(f"[SUBPROCESS {name}] Exit code: {rc}")
+
 
     def toggle_cook(self):
         if self.processes["cook"] is None:
