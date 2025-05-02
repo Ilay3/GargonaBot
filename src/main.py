@@ -1698,7 +1698,7 @@ class MainWindow(QMainWindow):
                         "--service=reconnect",
                         settings_path
                     ],
-                    stdout=open('reconnect.log', 'w'),
+
                     stderr=subprocess.STDOUT,
 
                 )
