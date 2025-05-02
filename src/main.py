@@ -1688,7 +1688,7 @@ class MainWindow(QMainWindow):
 
                 # Явно указываем полный путь к скрипту
                 reconnect_script = os.path.abspath(
-                    os.path.join(MODULES_BASE, "OtherService", "reconnect.py")
+                    os.path.join(MODULES_BASE, "OtherService", "reconect.py")
                 )
 
                 proc = subprocess.Popen(
@@ -1700,7 +1700,7 @@ class MainWindow(QMainWindow):
                     ],
                     stdout=open('reconnect.log', 'w'),
                     stderr=subprocess.STDOUT,
-                    creationflags=subprocess.CREATE_NO_WINDOW
+
                 )
                 self.processes["reconnect"] = proc
                 print(f"[DEBUG] PID процесса: {proc.pid}")

@@ -342,7 +342,7 @@ def run_fullreconnect_bot():
                 ("image1.png", 0, 0, 1),
                 ("image21.png", 0, 0, 1),
                 ("image6.png", 0, 0, 1),
-                ("cursor.png", 0, 0, 1),
+
                 ("Пароль", 30, 0, 1),
                 ("Войти", 0, 0, 1),
                 ("image4.png", 0, 0, 1)
@@ -404,19 +404,19 @@ def run_fullreconnect_bot():
             activate_window()
             print(f"[INFO] Обработка шага {idx + 1}/{len(CONFIG['image_sequence'])}: {image}")
 
-            if image == "cursor.png":
-                print("[DEBUG] Проверка наличия курсора")
-                success = try_find_and_click(
-                    image,
-                    max_attempts=3,
-                    confidence=0.7,
-                    offset=(offset_x, offset_y)
-                )
-                if not success:
-                    print("[WARNING] Курсор не найден, нажимаю F2")
-                    pyautogui.press('f2')
-                    time.sleep(1)
-                continue
+            # if image == "cursor.png":
+            #     print("[DEBUG] Проверка наличия курсора")
+            #     success = try_find_and_click(
+            #         image,
+            #         max_attempts=3,
+            #         confidence=0.7,
+            #         offset=(offset_x, offset_y)
+            #     )
+            #     if not success:
+            #         print("[WARNING] Курсор не найден, нажимаю F2")
+            #         pyautogui.press('f2')
+            #         time.sleep(1)
+            #     continue
 
             if image == "Пароль":
                 print("[DEBUG] Поиск поля для ввода пароля")
