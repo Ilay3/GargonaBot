@@ -1430,7 +1430,7 @@ class MainWindow(QMainWindow):
             try:
                 self.processes["port"] = subprocess.Popen(
                     [python_executable, script_path, "--service=port"],
-                    creationflags=subprocess.CREATE_NO_WINDOW  # Без окна
+                      # Без окна
                 )
                 self.port_button.setText("Остановить работу в Порту")
                 self.port_button.setStyleSheet(
@@ -1492,7 +1492,7 @@ class MainWindow(QMainWindow):
             try:
                 self.processes["kozlodoy"] = subprocess.Popen(
                     [python_executable, script_path, "--service=kozlodoy"],
-                    creationflags=subprocess.CREATE_NO_WINDOW  # Без окна
+
                 )
                 self.kozlodoy_button.setText("Остановить работу на Ферме")
                 self.kozlodoy_button.setStyleSheet(

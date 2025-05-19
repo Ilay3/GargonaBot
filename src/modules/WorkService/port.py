@@ -18,34 +18,45 @@ def log(message):
     print(f"[{timestamp}] {message}")
 
 
-
-
-
-
-
-
 def pixel_check():
-    """Проверка цвета пикселей и нажатие клавиши E"""
+    """Проверка только боковых пикселей с улучшенным определением зоны"""
     try:
-        x, y = 959, 495  # Центральные координаты
-        right = pyautogui.pixel(963, 495)
-        left = pyautogui.pixel(956, 495)
-        mid = pyautogui.pixel(x, y)
+        # Обновленные координаты на основе логов
+        left_x, right_x = 956, 963
+        y = 495
 
-        if right == (126, 211, 33) and left == (126, 211, 33):
+        # Цвета из ваших логов
+        target_green = (126, 211, 33)
+        tolerance = 15  # Более строгий допуск
+
+        def is_green(pixel):
+            return all(abs(pixel[i] - target_green[i]) <= tolerance for i in range(3))
+
+        left_green = is_green(pyautogui.pixel(left_x, y))
+        right_green = is_green(pyautogui.pixel(right_x, y))
+
+        # Логирование для диагностики
+        print(f"Левый ({left_x},{y}): {left_green} | Правый ({right_x},{y}): {right_green}")
+
+        # Активируем когда оба крайних пикселя зеленые
+        if left_green and right_green:
             pyautogui.press('e')
-        elif mid != (231, 33, 57):
-            pyautogui.press('e')
+            print("!!! УСПЕШНОЕ СРАБАТЫВАНИЕ !!!")
+            time.sleep(0.07)  # Оптимальная задержка
+            return True
+
+        return False
+
     except Exception as e:
-        log(f"Ошибка при проверке пикселей: {str(e)}")
-
+        print(f"Ошибка: {str(e)}")
+        return False
 
 def run_port():
 
 
 
 
-    log("Сервис Порт: Инициализация...")
+    print("Сервис Порт: Инициализация...")
     search_region = (583, 986, 1390, 1060)  # Область поиска кнопок
 
     try:
@@ -64,16 +75,16 @@ def run_port():
 
 
     except KeyboardInterrupt:
-        log("Работа сервиса прервана пользователем")
+        print("Работа сервиса прервана пользователем")
     except Exception as e:
-        log(f"Критическая ошибка: {str(e)}")
+        print(f"Критическая ошибка: {str(e)}")
         sys.exit(1)
 
 
 if __name__ == "__main__":
     if "--service" in sys.argv:
-        log("Запуск сервиса схем в сервисном режиме")
+        print("Запуск сервиса схем в сервисном режиме")
         run_port()
-        log("Сервис схем завершил работу")
+        print("Сервис схем завершил работу")
     else:
-        log("Для запуска используйте флаг --service")
+        print("Для запуска используйте флаг --service")
